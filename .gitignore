@@ -1,0 +1,64 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Node / Expo / React Native
+node_modules/
+.expo/
+.expo-shared/
+dist/
+web-build/
+build/
+coverage/
+
+# Metro / Watchman
+.metro-cache/
+.watchmanconfig
+
+# iOS / Android generated files
+ios/
+android/
+*.mobileprovision
+*.p8
+*.p12
+*.key
+*.pem
+
+# Java / Kotlin / Gradle
+.gradle/
+**/build/
+out/
+*.class
+
+# Spring Boot
+application-local.yml
+application-local.yaml
+application-secret.yml
+application-secret.yaml
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Docker / local volumes
+docker-data/
+volumes/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
