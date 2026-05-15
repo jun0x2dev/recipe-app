@@ -1,5 +1,10 @@
 import { Recipe } from '../types/recipe';
 
+/**
+ * - 백엔드 연결 전 화면 검증에 사용하는 레시피 mock 데이터다.
+ * - 목록, 상세, 검색, 공개/비공개 표시 흐름을 확인할 수 있게 구성한다.
+ * - 실제 API 연동 시 repository 또는 API client 계층으로 대체한다.
+ */
 export const mockRecipes: Recipe[] = [
   {
     id: 'recipe-1',

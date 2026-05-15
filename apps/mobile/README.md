@@ -40,6 +40,7 @@ apps/mobile/                         - 모바일 앱 루트
   app/                               - Expo Router 라우트 디렉터리
     _layout.tsx                      - 앱 전체 Stack 네비게이션, 헤더, StatusBar 설정
     index.tsx                        - 레시피 목록 홈 라우트
+    login.tsx                        - 로그인 라우트
     recipes/                         - 레시피 관련 라우트
       [id].tsx                       - 레시피 상세 라우트
       new.tsx                        - 레시피 작성 라우트
@@ -48,6 +49,12 @@ apps/mobile/                         - 모바일 앱 루트
       AppButton.tsx                  - 공통 버튼 컴포넌트
       Screen.tsx                     - 공통 화면 래퍼 컴포넌트
     features/                        - 기능 단위 코드
+      auth/                          - 인증 기능 모듈
+        AuthContext.tsx              - 로그인 토큰 상태 Context
+        screens/LoginScreen.tsx      - 네이버 로그인 화면
+        services/authApi.ts          - 백엔드 인증 API 호출
+        services/authConfig.ts       - 인증 런타임 설정
+        services/naverLogin.ts       - 네이버 로그인 SDK 어댑터
       recipes/                       - 레시피 기능 모듈
         components/                  - 레시피 기능 전용 UI 컴포넌트
           RecipeCard.tsx             - 레시피 목록 카드
@@ -70,11 +77,34 @@ apps/mobile/                         - 모바일 앱 루트
 
 ## 현재 화면
 
+- 로그인
 - 레시피 목록
 - 레시피 상세
 - 레시피 작성
 - 라이트/다크 모드 기본 대응
 - mock 데이터 기반 화면 흐름
+
+## 네이버 로그인 개발 설정
+
+네이버 로그인 화면과 백엔드 토큰 교환 흐름은 구현되어 있습니다.
+
+실제 네이버 SDK 로그인을 실행하려면 Expo Go가 아니라 개발 빌드가 필요합니다.
+
+```bash
+npx expo install @react-native-seoul/naver-login
+```
+
+패키지가 설치되면 `app.config.js`가 네이버 로그인 config plugin을 자동 등록합니다.
+SDK가 설치되지 않은 브라우저 확인 환경에서는 plugin 등록을 건너뛰어 `npm run start`가 실패하지 않게 합니다.
+
+네이버 Client Secret은 저장소에 커밋하지 말고 로컬 환경 변수로 주입합니다.
+
+```bash
+EXPO_PUBLIC_NAVER_CLIENT_SECRET=네이버_클라이언트_시크릿
+EXPO_PUBLIC_API_BASE_URL=http://localhost:8089
+```
+
+실기기에서 로컬 백엔드에 접근할 때는 `EXPO_PUBLIC_API_BASE_URL`을 PC의 LAN IP로 지정합니다.
 
 ## 구조 원칙
 

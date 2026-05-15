@@ -4,14 +4,26 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AppButton } from '../../../components/AppButton';
 import { Screen } from '../../../components/Screen';
+import { useAuth } from '../../auth/AuthContext';
 import { useAppTheme } from '../../../theme/useAppTheme';
 import { RecipeCard } from '../components/RecipeCard';
 import { mockRecipes } from '../data/mockRecipes';
 
+/**
+ * - 사용자의 레시피 목록을 보여주는 화면이다.
+ * - mock 데이터 기반으로 검색, 공개 개수 요약, 상세 이동을 제공한다.
+ * - 백엔드 API 연결 전까지 MVP 화면 흐름을 검증하는 기준 화면이다.
+ */
 export function RecipeListScreen() {
   const theme = useAppTheme();
+  const { signOut } = useAuth();
   const [keyword, setKeyword] = useState('');
 
+  /**
+   * - 검색어에 맞는 레시피 목록을 계산한다.
+   * - 제목, 설명, 재료를 대상으로 대소문자 구분 없이 필터링한다.
+   * - 검색어가 비어 있으면 전체 mock 데이터를 반환한다.
+   */
   const recipes = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLowerCase();
 
@@ -33,7 +45,10 @@ export function RecipeListScreen() {
           <Text style={[styles.kicker, { color: theme.textMuted }]}>오늘의 레시피 보관함</Text>
           <Text style={[styles.title, { color: theme.text }]}>내 레시피</Text>
         </View>
-        <AppButton label="작성" theme={theme} onPress={() => router.push('/recipes/new')} />
+        <View style={styles.headerActions}>
+          <AppButton label="로그아웃" theme={theme} variant="secondary" onPress={signOut} />
+          <AppButton label="작성" theme={theme} onPress={() => router.push('/recipes/new')} />
+        </View>
       </View>
 
       <TextInput
@@ -70,10 +85,15 @@ export function RecipeListScreen() {
 
 const styles = StyleSheet.create({
   header: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     flexDirection: 'row',
     gap: 16,
     justifyContent: 'space-between',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    flexShrink: 0,
+    gap: 8,
   },
   kicker: {
     fontSize: 13,

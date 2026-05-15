@@ -5,10 +5,20 @@ import { useAppTheme } from '../../../theme/useAppTheme';
 import { VisibilityBadge } from '../components/VisibilityBadge';
 import { mockRecipes } from '../data/mockRecipes';
 
+/**
+ * - 레시피 상세 화면 props다.
+ * - recipeId는 Expo Router 동적 경로에서 전달된다.
+ * - 값이 없거나 일치하는 데이터가 없으면 not found 상태를 표시한다.
+ */
 type RecipeDetailScreenProps = {
   recipeId?: string;
 };
 
+/**
+ * - 선택된 레시피의 상세 정보를 보여주는 화면이다.
+ * - mock 데이터에서 recipeId로 레시피를 찾아 렌더링한다.
+ * - 재료와 조리 단계는 읽기 전용 목록으로 표시한다.
+ */
 export function RecipeDetailScreen({ recipeId }: RecipeDetailScreenProps) {
   const theme = useAppTheme();
   const recipe = mockRecipes.find((item) => item.id === recipeId);

@@ -39,6 +39,7 @@ android/
 # Java / Kotlin / Gradle
 .gradle/
 **/build/
+**/bin/
 out/
 *.class
 
@@ -61,4 +62,3 @@ volumes/
 tmp/
 temp/
 *.tmp
-
