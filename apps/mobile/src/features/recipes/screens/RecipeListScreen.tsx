@@ -4,7 +4,6 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AppButton } from '../../../components/AppButton';
 import { Screen } from '../../../components/Screen';
-import { useAuth } from '../../auth/AuthContext';
 import { useAppTheme } from '../../../theme/useAppTheme';
 import { RecipeCard } from '../components/RecipeCard';
 import { mockRecipes } from '../data/mockRecipes';
@@ -16,7 +15,6 @@ import { mockRecipes } from '../data/mockRecipes';
  */
 export function RecipeListScreen() {
   const theme = useAppTheme();
-  const { signOut } = useAuth();
   const [keyword, setKeyword] = useState('');
 
   /**
@@ -42,13 +40,10 @@ export function RecipeListScreen() {
     <Screen theme={theme}>
       <View style={styles.header}>
         <View>
-          <Text style={[styles.kicker, { color: theme.textMuted }]}>오늘의 레시피 보관함</Text>
+          <Text style={[styles.kicker, { color: theme.textMuted }]}>내가 기록한 요리</Text>
           <Text style={[styles.title, { color: theme.text }]}>내 레시피</Text>
         </View>
-        <View style={styles.headerActions}>
-          <AppButton label="로그아웃" theme={theme} variant="secondary" onPress={signOut} />
-          <AppButton label="작성" theme={theme} onPress={() => router.push('/recipes/new')} />
-        </View>
+        <AppButton label="작성" theme={theme} onPress={() => router.push('/recipes/new')} />
       </View>
 
       <TextInput
@@ -56,16 +51,13 @@ export function RecipeListScreen() {
         placeholderTextColor={theme.textMuted}
         value={keyword}
         onChangeText={setKeyword}
-        style={[
-          styles.searchInput,
-          { backgroundColor: theme.input, borderColor: theme.border, color: theme.text },
-        ]}
+        style={[styles.searchInput, { backgroundColor: theme.surfaceMuted, color: theme.text }]}
       />
 
-      <View style={styles.summaryRow}>
-        <Text style={[styles.summary, { color: theme.textMuted }]}>총 {recipes.length}개</Text>
+      <View style={[styles.summaryBox, { backgroundColor: theme.surfaceMuted }]}>
+        <Text style={[styles.summaryNumber, { color: theme.text }]}>{recipes.length}</Text>
         <Text style={[styles.summary, { color: theme.textMuted }]}>
-          공개 {recipes.filter((recipe) => recipe.visibility === 'public').length}개
+          저장된 레시피, 공개 {recipes.filter((recipe) => recipe.visibility === 'public').length}개
         </Text>
       </View>
 
@@ -85,35 +77,34 @@ export function RecipeListScreen() {
 
 const styles = StyleSheet.create({
   header: {
-    alignItems: 'flex-start',
+    alignItems: 'center',
     flexDirection: 'row',
     gap: 16,
     justifyContent: 'space-between',
   },
-  headerActions: {
-    flexDirection: 'row',
-    flexShrink: 0,
-    gap: 8,
-  },
   kicker: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
     marginBottom: 6,
   },
   title: {
-    fontSize: 30,
+    fontSize: 27,
     fontWeight: '800',
   },
   searchInput: {
-    borderRadius: 8,
-    borderWidth: 1,
+    borderRadius: 14,
     fontSize: 16,
-    minHeight: 48,
-    paddingHorizontal: 14,
+    minHeight: 52,
+    paddingHorizontal: 16,
   },
-  summaryRow: {
-    flexDirection: 'row',
-    gap: 12,
+  summaryBox: {
+    borderRadius: 16,
+    gap: 2,
+    padding: 18,
+  },
+  summaryNumber: {
+    fontSize: 24,
+    fontWeight: '800',
   },
   summary: {
     fontSize: 13,

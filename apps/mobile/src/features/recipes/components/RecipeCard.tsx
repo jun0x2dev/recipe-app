@@ -27,22 +27,31 @@ export function RecipeCard({ recipe, theme, onPress }: RecipeCardProps) {
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
-        { backgroundColor: theme.surface, borderColor: theme.border, opacity: pressed ? 0.82 : 1 },
+        { backgroundColor: theme.surfaceMuted, opacity: pressed ? 0.78 : 1 },
       ]}
     >
-      <View style={styles.header}>
-        <Text numberOfLines={1} style={[styles.title, { color: theme.text }]}>
-          {recipe.title}
+      <View style={[styles.thumbnail, { backgroundColor: theme.surface }]}>
+        <Text style={[styles.thumbnailText, { color: theme.textMuted }]}>
+          {recipe.title.slice(0, 1)}
         </Text>
-        <VisibilityBadge visibility={recipe.visibility} theme={theme} />
       </View>
-      <Text numberOfLines={2} style={[styles.description, { color: theme.textMuted }]}>
-        {recipe.description}
-      </Text>
-      <View style={styles.metaRow}>
-        <Text style={[styles.meta, { color: theme.textMuted }]}>{recipe.cookingTimeMinutes}분</Text>
-        <Text style={[styles.meta, { color: theme.textMuted }]}>조회 {recipe.viewCount}</Text>
-        <Text style={[styles.meta, { color: theme.textMuted }]}>좋아요 {recipe.likeCount}</Text>
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <Text numberOfLines={1} style={[styles.title, { color: theme.text }]}>
+            {recipe.title}
+          </Text>
+          <VisibilityBadge visibility={recipe.visibility} theme={theme} />
+        </View>
+        <Text numberOfLines={2} style={[styles.description, { color: theme.textMuted }]}>
+          {recipe.description}
+        </Text>
+        <View style={styles.metaRow}>
+          <Text style={[styles.meta, { color: theme.textMuted }]}>{recipe.cookingTimeMinutes}분</Text>
+          <Text style={[styles.metaDot, { color: theme.textMuted }]}>·</Text>
+          <Text style={[styles.meta, { color: theme.textMuted }]}>조회 {recipe.viewCount}</Text>
+          <Text style={[styles.metaDot, { color: theme.textMuted }]}>·</Text>
+          <Text style={[styles.meta, { color: theme.textMuted }]}>좋아요 {recipe.likeCount}</Text>
+        </View>
       </View>
     </Pressable>
   );
@@ -50,9 +59,26 @@ export function RecipeCard({ recipe, theme, onPress }: RecipeCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 8,
-    borderWidth: 1,
-    padding: 16,
+    alignItems: 'center',
+    borderRadius: 16,
+    flexDirection: 'row',
+    gap: 14,
+    padding: 18,
+  },
+  thumbnail: {
+    alignItems: 'center',
+    borderRadius: 14,
+    height: 72,
+    justifyContent: 'center',
+    width: 72,
+  },
+  thumbnailText: {
+    fontSize: 24,
+    fontWeight: '900',
+  },
+  content: {
+    flex: 1,
+    gap: 7,
   },
   header: {
     alignItems: 'center',
@@ -62,22 +88,25 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '800',
   },
   description: {
     fontSize: 14,
     lineHeight: 20,
-    marginTop: 10,
   },
   metaRow: {
+    alignItems: 'center',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 14,
-    marginTop: 14,
+    gap: 6,
   },
   meta: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
+  },
+  metaDot: {
+    fontSize: 12,
+    fontWeight: '800',
   },
 });

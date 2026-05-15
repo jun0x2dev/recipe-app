@@ -37,11 +37,11 @@ export function Screen({ children, theme, scroll = true }: ScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    padding: 24,
   },
   content: {
-    gap: 16,
-    padding: 20,
-    paddingBottom: 40,
+    gap: 20,
+    padding: 24,
+    paddingBottom: 36,
   },
 });
