@@ -54,6 +54,7 @@ apps/mobile/                         - 모바일 앱 루트
         screens/LoginScreen.tsx      - 네이버 로그인 화면
         services/authApi.ts          - 백엔드 인증 API 호출
         services/authConfig.ts       - 인증 런타임 설정
+        services/googleLogin.ts      - Google 웹 로그인 어댑터
         services/naverLogin.ts       - 네이버 로그인 SDK 어댑터
       recipes/                       - 레시피 기능 모듈
         components/                  - 레시피 기능 전용 UI 컴포넌트
@@ -105,6 +106,25 @@ EXPO_PUBLIC_API_BASE_URL=http://localhost:8089
 ```
 
 실기기에서 로컬 백엔드에 접근할 때는 `EXPO_PUBLIC_API_BASE_URL`을 PC의 LAN IP로 지정합니다.
+
+## Google 로그인 개발 설정
+
+브라우저에서는 Web Client ID 기반 Google OAuth 흐름을 먼저 확인합니다.
+
+Google Console의 승인된 리디렉션 URI에 아래 값을 추가합니다.
+
+```text
+http://localhost:8081/login
+http://localhost:19006/login
+```
+
+로컬 환경 변수에는 Web Client ID만 넣습니다.
+
+```bash
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=구글_WEB_CLIENT_ID
+```
+
+Google Client Secret은 모바일 앱에 넣지 않습니다.
 
 ## 구조 원칙
 

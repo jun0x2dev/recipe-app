@@ -1,5 +1,6 @@
 package com.leejun.recipeapp.domain.auth.service
 
+import com.leejun.recipeapp.domain.auth.dto.GoogleLoginRequest
 import com.leejun.recipeapp.domain.auth.dto.LoginRequest
 import com.leejun.recipeapp.domain.auth.dto.NaverLoginRequest
 import com.leejun.recipeapp.domain.auth.dto.RefreshTokenRequest
@@ -15,6 +16,7 @@ interface AuthService {
     fun signUp(request: SignUpRequest): TokenResponse
     fun login(request: LoginRequest): TokenResponse
     fun loginWithNaver(request: NaverLoginRequest): TokenResponse
+    fun loginWithGoogle(request: GoogleLoginRequest): TokenResponse
     fun refresh(request: RefreshTokenRequest): TokenResponse
     fun logout(request: RefreshTokenRequest)
 }

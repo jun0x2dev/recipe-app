@@ -1,6 +1,7 @@
 package com.leejun.recipeapp.domain.auth.service.impl
 
 import com.leejun.recipeapp.domain.auth.dto.LoginRequest
+import com.leejun.recipeapp.domain.auth.dto.GoogleLoginRequest
 import com.leejun.recipeapp.domain.auth.dto.NaverLoginRequest
 import com.leejun.recipeapp.domain.auth.dto.RefreshTokenRequest
 import com.leejun.recipeapp.domain.auth.dto.SignUpRequest
@@ -10,6 +11,8 @@ import com.leejun.recipeapp.domain.auth.entity.RefreshToken
 import com.leejun.recipeapp.domain.auth.entity.User
 import com.leejun.recipeapp.domain.auth.entity.UserAuthProvider
 import com.leejun.recipeapp.domain.auth.entity.UserStatus
+import com.leejun.recipeapp.domain.auth.oauth.GoogleProfile
+import com.leejun.recipeapp.domain.auth.oauth.GoogleTokenVerifier
 import com.leejun.recipeapp.domain.auth.oauth.NaverProfile
 import com.leejun.recipeapp.domain.auth.oauth.NaverProfileClient
 import com.leejun.recipeapp.domain.auth.repository.RefreshTokenRepository
@@ -37,6 +40,7 @@ class AuthServiceImpl(
     private val userRepository: UserRepository,
     private val refreshTokenRepository: RefreshTokenRepository,
     private val userAuthProviderRepository: UserAuthProviderRepository,
+    private val googleTokenVerifier: GoogleTokenVerifier,
     private val naverProfileClient: NaverProfileClient,
     private val passwordEncoder: PasswordEncoder,
     private val jwtProvider: JwtProvider,
@@ -125,6 +129,43 @@ class AuthServiceImpl(
     }
 
     /**
+     * - Google id token을 검증해 Google 프로필을 조회한다.
+     * - 기존 provider 연결이 있으면 연결된 내부 사용자로 앱 JWT를 발급한다.
+     * - 연결이 없으면 내부 사용자와 GOOGLE provider 연결을 새로 생성한다.
+     */
+    @Transactional
+    override fun loginWithGoogle(request: GoogleLoginRequest): TokenResponse {
+        val profile = googleTokenVerifier.verify(request.idToken)
+        val linkedProvider = userAuthProviderRepository
+            .findByProviderAndProviderUserId(AuthProvider.GOOGLE, profile.providerUserId)
+            .orElse(null)
+
+        if (linkedProvider != null) {
+            val user = linkedProvider.user
+            if (user.status != UserStatus.ACTIVE) {
+                throw CustomException(ErrorCode.USER_NOT_ACTIVE)
+            }
+
+            log.info("Google user logged in: {}", profile.providerUserId)
+            return issueTokens(user)
+        }
+
+        val savedUser = createGoogleUser(profile)
+        userAuthProviderRepository.save(
+            UserAuthProvider.create(
+                user = savedUser,
+                provider = AuthProvider.GOOGLE,
+                providerUserId = profile.providerUserId,
+                providerEmail = profile.email,
+                emailVerified = profile.emailVerified
+            )
+        )
+
+        log.info("New Google user registered: {}", profile.providerUserId)
+        return issueTokens(savedUser)
+    }
+
+    /**
      * - refresh token을 검증하고 새 토큰 쌍을 발급한다.
      * - 기존 refresh token은 즉시 폐기해 재사용을 막는다.
      * - 저장소에 없는 토큰이나 만료된 토큰은 INVALID_REFRESH_TOKEN으로 처리한다.
@@ -172,6 +213,20 @@ class AuthServiceImpl(
      * - 자동 계정 연결 정책은 별도 기능으로 분리해 명시적으로 구현한다.
      */
     private fun createNaverUser(profile: NaverProfile): User =
+        userRepository.save(
+            User.createSocialUser(
+                email = profile.email,
+                nickname = profile.nickname,
+                profileImageUrl = profile.profileImageUrl
+            )
+        )
+
+    /**
+     * - Google 프로필 기반으로 비밀번호 없는 소셜 사용자를 생성한다.
+     * - Google email_verified는 provider 연결 정보에 저장하고 계정 자동 연결에는 쓰지 않는다.
+     * - 같은 이메일의 기존 계정 연결은 별도 명시 정책에서 처리한다.
+     */
+    private fun createGoogleUser(profile: GoogleProfile): User =
         userRepository.save(
             User.createSocialUser(
                 email = profile.email,

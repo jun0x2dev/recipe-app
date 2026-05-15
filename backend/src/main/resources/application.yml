@@ -16,3 +16,7 @@ management:
 oauth:
   naver:
     profile-uri: https://openapi.naver.com/v1/nid/me
+  google:
+    token-info-uri: https://oauth2.googleapis.com/tokeninfo
+    allowed-audiences:
+      - 804702637608-t0d9lrq0arlf1kn4hdpsjmvof94mps5e.apps.googleusercontent.com

@@ -1,12 +1,17 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 
 import { AppButton } from '../../../components/AppButton';
 import { Screen } from '../../../components/Screen';
 import { useAppTheme } from '../../../theme/useAppTheme';
 import { useAuth } from '../AuthContext';
-import { loginWithNaverAccessToken } from '../services/authApi';
+import { loginWithGoogleIdToken, loginWithNaverAccessToken } from '../services/authApi';
+import {
+  consumeGoogleRedirectIdToken,
+  GoogleLoginError,
+  redirectToGoogleLogin,
+} from '../services/googleLogin';
 import { NaverLoginError, requestNaverAccessToken } from '../services/naverLogin';
 
 /**
@@ -19,6 +24,38 @@ export function LoginScreen() {
   const { signIn } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  /**
+   * - Google OAuth redirect로 돌아온 id_token을 감지한다.
+   * - id_token을 백엔드에 교환해 앱 자체 JWT를 저장한다.
+   * - redirect hash는 소비 후 제거해 새로고침 시 중복 로그인을 막는다.
+   */
+  useEffect(() => {
+    const handleGoogleRedirect = async () => {
+      try {
+        const idToken = consumeGoogleRedirectIdToken();
+
+        if (!idToken) {
+          return;
+        }
+
+        setIsLoading(true);
+        const tokenResponse = await loginWithGoogleIdToken(idToken);
+        signIn(tokenResponse);
+        router.replace('/');
+      } catch (error) {
+        if (error instanceof Error) {
+          setMessage(error.message);
+        } else {
+          setMessage('Google 로그인 처리 중 알 수 없는 오류가 발생했습니다.');
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    handleGoogleRedirect();
+  }, [signIn]);
 
   /**
    * - 브라우저 개발 확인용으로 인증 화면을 우회한다.
@@ -62,6 +99,27 @@ export function LoginScreen() {
     }
   };
 
+  /**
+   * - 브라우저에서 Google OAuth 로그인 화면으로 이동한다.
+   * - 실제 토큰 검증과 앱 JWT 발급은 redirect 후 useEffect에서 처리한다.
+   * - 네이티브 iOS 검증은 추후 iOS Client ID와 dev build에서 확장한다.
+   */
+  const handleGoogleLogin = () => {
+    setMessage(null);
+
+    try {
+      redirectToGoogleLogin();
+    } catch (error) {
+      if (error instanceof GoogleLoginError) {
+        setMessage(error.message);
+      } else if (error instanceof Error) {
+        setMessage(error.message);
+      } else {
+        setMessage('Google 로그인 시작 중 알 수 없는 오류가 발생했습니다.');
+      }
+    }
+  };
+
   return (
     <Screen theme={theme}>
       <View style={styles.header}>
@@ -83,6 +141,15 @@ export function LoginScreen() {
           disabled={isLoading}
           onPress={handleNaverLogin}
         />
+        {Platform.OS === 'web' ? (
+          <AppButton
+            label="Google로 계속하기"
+            theme={theme}
+            variant="secondary"
+            disabled={isLoading}
+            onPress={handleGoogleLogin}
+          />
+        ) : null}
         {Platform.OS === 'web' ? (
           <AppButton
             label="브라우저에서 둘러보기"

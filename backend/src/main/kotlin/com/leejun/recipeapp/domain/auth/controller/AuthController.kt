@@ -1,6 +1,7 @@
 package com.leejun.recipeapp.domain.auth.controller
 
 import com.leejun.recipeapp.domain.auth.dto.LoginRequest
+import com.leejun.recipeapp.domain.auth.dto.GoogleLoginRequest
 import com.leejun.recipeapp.domain.auth.dto.NaverLoginRequest
 import com.leejun.recipeapp.domain.auth.dto.RefreshTokenRequest
 import com.leejun.recipeapp.domain.auth.dto.SignUpRequest
@@ -48,6 +49,15 @@ class AuthController(
     @PostMapping("/oauth/naver")
     fun loginWithNaver(@Valid @RequestBody request: NaverLoginRequest): ApiResponse<TokenResponse> =
         ApiResponse.ok(authService.loginWithNaver(request))
+
+    /**
+     * - 모바일 또는 웹 클라이언트가 Google에서 받은 id token을 앱 자체 JWT로 교환한다.
+     * - 백엔드는 Google token의 audience를 허용 목록과 비교해 위조 토큰을 차단한다.
+     * - 신규 Google 사용자는 내부 사용자와 제공자 연결 정보를 함께 생성한다.
+     */
+    @PostMapping("/oauth/google")
+    fun loginWithGoogle(@Valid @RequestBody request: GoogleLoginRequest): ApiResponse<TokenResponse> =
+        ApiResponse.ok(authService.loginWithGoogle(request))
 
     /**
      * - 유효한 refresh token으로 새로운 access token과 refresh token을 발급한다.
