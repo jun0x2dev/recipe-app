@@ -33,7 +33,7 @@ export function RecipeDetailScreen({ recipeId }: RecipeDetailScreenProps) {
 
   return (
     <Screen theme={theme}>
-      <View style={[styles.hero, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+      <View style={[styles.hero, { backgroundColor: theme.surfaceMuted }]}>
         <View style={styles.heroHeader}>
           <Text style={[styles.title, { color: theme.text }]}>{recipe.title}</Text>
           <VisibilityBadge visibility={recipe.visibility} theme={theme} />
@@ -51,7 +51,7 @@ export function RecipeDetailScreen({ recipeId }: RecipeDetailScreenProps) {
         <Text style={[styles.sectionTitle, { color: theme.text }]}>재료</Text>
         {recipe.ingredients.map((ingredient) => (
           <Text key={ingredient} style={[styles.listItem, { color: theme.textMuted }]}>
-            - {ingredient}
+            {ingredient}
           </Text>
         ))}
       </View>
@@ -60,7 +60,7 @@ export function RecipeDetailScreen({ recipeId }: RecipeDetailScreenProps) {
         <Text style={[styles.sectionTitle, { color: theme.text }]}>조리 방법</Text>
         {recipe.steps.map((step, index) => (
           <View key={step} style={styles.stepRow}>
-            <Text style={[styles.stepNumber, { color: theme.primary }]}>{index + 1}</Text>
+            <Text style={[styles.stepNumber, { color: theme.text }]}>{index + 1}</Text>
             <Text style={[styles.stepText, { color: theme.textMuted }]}>{step}</Text>
           </View>
         ))}
@@ -71,9 +71,8 @@ export function RecipeDetailScreen({ recipeId }: RecipeDetailScreenProps) {
 
 const styles = StyleSheet.create({
   hero: {
-    borderRadius: 8,
-    borderWidth: 1,
-    padding: 18,
+    borderRadius: 18,
+    padding: 20,
   },
   heroHeader: {
     alignItems: 'flex-start',
@@ -106,7 +105,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 19,
     fontWeight: '800',
   },
   listItem: {
@@ -120,7 +119,7 @@ const styles = StyleSheet.create({
   stepNumber: {
     fontSize: 16,
     fontWeight: '800',
-    width: 22,
+    width: 24,
   },
   stepText: {
     flex: 1,

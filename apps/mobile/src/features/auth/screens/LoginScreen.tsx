@@ -17,7 +17,7 @@ import { NaverLoginError, requestNaverAccessToken } from '../services/naverLogin
 /**
  * - 앱 로그인 화면이다.
  * - 네이버 SDK에서 access token을 받은 뒤 백엔드 JWT로 교환한다.
- * - Apple과 Google 로그인 버튼은 추후 같은 화면에 확장한다.
+ * - 소셜 버튼은 강한 브랜드색보다 중립 버튼 스타일을 우선한다.
  */
 export function LoginScreen() {
   const theme = useAppTheme();
@@ -123,21 +123,20 @@ export function LoginScreen() {
   return (
     <Screen theme={theme}>
       <View style={styles.header}>
+        <View style={[styles.logo, { backgroundColor: theme.surfaceMuted }]}>
+          <Text style={[styles.logoText, { color: theme.text }]}>R</Text>
+        </View>
         <Text style={[styles.kicker, { color: theme.textMuted }]}>Recipe App</Text>
-        <Text style={[styles.title, { color: theme.text }]}>로그인</Text>
+        <Text style={[styles.title, { color: theme.text }]}>내 레시피를 가볍게 기록하세요</Text>
         <Text style={[styles.description, { color: theme.textMuted }]}>
-          네이버 계정으로 시작해 내 레시피를 안전하게 관리하세요.
+          소셜 계정으로 시작하고, 내가 만든 요리를 한 곳에서 관리하세요.
         </Text>
       </View>
 
       <View style={styles.actions}>
         <AppButton
           label={isLoading ? '처리 중' : '네이버로 계속하기'}
-          theme={{
-            ...theme,
-            primary: '#03C75A',
-            primaryText: '#FFFFFF',
-          }}
+          theme={theme}
           disabled={isLoading}
           onPress={handleNaverLogin}
         />
@@ -168,16 +167,29 @@ export function LoginScreen() {
 
 const styles = StyleSheet.create({
   header: {
-    gap: 8,
-    paddingTop: 48,
+    gap: 10,
+    paddingTop: 56,
+  },
+  logo: {
+    alignItems: 'center',
+    borderRadius: 18,
+    height: 56,
+    justifyContent: 'center',
+    marginBottom: 10,
+    width: 56,
+  },
+  logoText: {
+    fontSize: 24,
+    fontWeight: '900',
   },
   kicker: {
     fontSize: 13,
     fontWeight: '700',
   },
   title: {
-    fontSize: 30,
+    fontSize: 34,
     fontWeight: '800',
+    lineHeight: 42,
   },
   description: {
     fontSize: 15,

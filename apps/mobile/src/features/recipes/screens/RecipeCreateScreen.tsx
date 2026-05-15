@@ -64,7 +64,7 @@ export function RecipeCreateScreen() {
           placeholderTextColor={theme.textMuted}
           value={draft.title}
           onChangeText={(title) => updateDraft({ title })}
-          style={[styles.input, { backgroundColor: theme.input, borderColor: theme.border, color: theme.text }]}
+          style={[styles.input, { backgroundColor: theme.surfaceMuted, color: theme.text }]}
         />
       </Field>
 
@@ -78,7 +78,7 @@ export function RecipeCreateScreen() {
           style={[
             styles.input,
             styles.multiline,
-            { backgroundColor: theme.input, borderColor: theme.border, color: theme.text },
+            { backgroundColor: theme.surfaceMuted, color: theme.text },
           ]}
         />
       </Field>
@@ -90,7 +90,7 @@ export function RecipeCreateScreen() {
           placeholderTextColor={theme.textMuted}
           value={draft.cookingTimeMinutes}
           onChangeText={(cookingTimeMinutes) => updateDraft({ cookingTimeMinutes })}
-          style={[styles.input, { backgroundColor: theme.input, borderColor: theme.border, color: theme.text }]}
+          style={[styles.input, { backgroundColor: theme.surfaceMuted, color: theme.text }]}
         />
       </Field>
 
@@ -108,7 +108,6 @@ export function RecipeCreateScreen() {
                   styles.segmentItem,
                   {
                     backgroundColor: isSelected ? theme.primary : theme.surfaceMuted,
-                    borderColor: isSelected ? theme.primary : theme.border,
                   },
                 ]}
               >
@@ -136,7 +135,7 @@ export function RecipeCreateScreen() {
           style={[
             styles.input,
             styles.multiline,
-            { backgroundColor: theme.input, borderColor: theme.border, color: theme.text },
+            { backgroundColor: theme.surfaceMuted, color: theme.text },
           ]}
         />
       </Field>
@@ -151,7 +150,7 @@ export function RecipeCreateScreen() {
           style={[
             styles.input,
             styles.multiline,
-            { backgroundColor: theme.input, borderColor: theme.border, color: theme.text },
+            { backgroundColor: theme.surfaceMuted, color: theme.text },
           ]}
         />
       </Field>
@@ -198,8 +197,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   input: {
-    borderRadius: 8,
-    borderWidth: 1,
+    borderRadius: 14,
     fontSize: 16,
     minHeight: 48,
     paddingHorizontal: 14,
@@ -215,8 +213,7 @@ const styles = StyleSheet.create({
   },
   segmentItem: {
     alignItems: 'center',
-    borderRadius: 8,
-    borderWidth: 1,
+    borderRadius: 14,
     flex: 1,
     minHeight: 44,
     justifyContent: 'center',

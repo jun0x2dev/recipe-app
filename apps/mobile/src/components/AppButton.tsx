@@ -52,13 +52,13 @@ export function AppButton({
 const styles = StyleSheet.create({
   button: {
     alignItems: 'center',
-    borderRadius: 8,
-    minHeight: 48,
+    borderRadius: 14,
+    minHeight: 52,
     justifyContent: 'center',
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
   },
   label: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '800',
   },
 });

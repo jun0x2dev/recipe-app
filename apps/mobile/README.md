@@ -39,7 +39,11 @@ npm run typecheck
 apps/mobile/                         - 모바일 앱 루트
   app/                               - Expo Router 라우트 디렉터리
     _layout.tsx                      - 앱 전체 Stack 네비게이션, 헤더, StatusBar 설정
-    index.tsx                        - 레시피 목록 홈 라우트
+    (tabs)/                          - 로그인 후 하단 탭 라우트 그룹
+      _layout.tsx                    - 내 레시피, 둘러보기, 설정 탭 구성
+      index.tsx                      - 내 레시피 탭 라우트
+      explore.tsx                    - 둘러보기 탭 라우트
+      settings.tsx                   - 설정 탭 라우트
     login.tsx                        - 로그인 라우트
     recipes/                         - 레시피 관련 라우트
       [id].tsx                       - 레시피 상세 라우트
@@ -51,11 +55,13 @@ apps/mobile/                         - 모바일 앱 루트
     features/                        - 기능 단위 코드
       auth/                          - 인증 기능 모듈
         AuthContext.tsx              - 로그인 토큰 상태 Context
-        screens/LoginScreen.tsx      - 네이버 로그인 화면
+        screens/LoginScreen.tsx      - 소셜 로그인 화면
         services/authApi.ts          - 백엔드 인증 API 호출
         services/authConfig.ts       - 인증 런타임 설정
         services/googleLogin.ts      - Google 웹 로그인 어댑터
         services/naverLogin.ts       - 네이버 로그인 SDK 어댑터
+      explore/                       - 공개 레시피 둘러보기 기능 모듈
+        screens/ExploreRecipeScreen.tsx - 다른 사용자 공개 레시피 화면
       recipes/                       - 레시피 기능 모듈
         components/                  - 레시피 기능 전용 UI 컴포넌트
           RecipeCard.tsx             - 레시피 목록 카드
@@ -68,8 +74,10 @@ apps/mobile/                         - 모바일 앱 루트
           RecipeListScreen.tsx       - 레시피 목록 화면
         types/                       - 레시피 도메인 타입
           recipe.ts                  - Recipe, RecipeDraft 타입
+      settings/                      - 설정 기능 모듈
+        screens/SettingsScreen.tsx   - 계정, 화면 모드, 앱 정보 설정 화면
     theme/                           - 라이트/다크 모드 테마
-      useAppTheme.ts                 - 앱 테마 hook
+      useAppTheme.tsx                - 앱 테마 Provider와 hook
   AGENTS.md                          - 모바일 앱 작업 규칙
   app.json                           - Expo 앱 설정
   package.json                       - npm 스크립트와 의존성
@@ -79,10 +87,13 @@ apps/mobile/                         - 모바일 앱 루트
 ## 현재 화면
 
 - 로그인
+- 하단 탭
 - 레시피 목록
+- 공개 레시피 둘러보기
+- 설정
 - 레시피 상세
 - 레시피 작성
-- 라이트/다크 모드 기본 대응
+- 라이트/다크/시스템 화면 모드 선택
 - mock 데이터 기반 화면 흐름
 
 ## 네이버 로그인 개발 설정

@@ -15,8 +15,8 @@ type VisibilityBadgeProps = {
 
 /**
  * - 레시피 공개 상태를 작은 배지로 표시한다.
- * - 공개는 success 색상, 비공개는 warning 색상으로 구분한다.
- * - 색상만이 아니라 텍스트도 함께 표시해 접근성을 보완한다.
+ * - 상태 의미는 텍스트로 전달하고 강한 색상 사용은 피한다.
+ * - 공개/비공개는 레시피 카드의 보조 정보로만 작게 표시한다.
  */
 export function VisibilityBadge({ visibility, theme }: VisibilityBadgeProps) {
   const isPublic = visibility === 'public';
@@ -25,10 +25,10 @@ export function VisibilityBadge({ visibility, theme }: VisibilityBadgeProps) {
     <View
       style={[
         styles.badge,
-        { backgroundColor: isPublic ? `${theme.success}20` : `${theme.warning}20` },
+        { backgroundColor: theme.surfaceMuted },
       ]}
     >
-      <Text style={[styles.text, { color: isPublic ? theme.success : theme.warning }]}>
+      <Text style={[styles.text, { color: theme.textMuted }]}>
         {isPublic ? '공개' : '비공개'}
       </Text>
     </View>
@@ -38,11 +38,11 @@ export function VisibilityBadge({ visibility, theme }: VisibilityBadgeProps) {
 const styles = StyleSheet.create({
   badge: {
     borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
   },
   text: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
   },
 });
