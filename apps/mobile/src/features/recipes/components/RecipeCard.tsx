@@ -4,12 +4,22 @@ import { AppTheme } from '../../../theme/useAppTheme';
 import { Recipe } from '../types/recipe';
 import { VisibilityBadge } from './VisibilityBadge';
 
+/**
+ * - 레시피 목록 카드 props다.
+ * - recipe는 표시할 도메인 데이터, theme는 색상 토큰, onPress는 상세 이동을 담당한다.
+ * - 카드 내부에서는 데이터 변경 없이 표시만 수행한다.
+ */
 type RecipeCardProps = {
   recipe: Recipe;
   theme: AppTheme;
   onPress: () => void;
 };
 
+/**
+ * - 레시피 목록에서 하나의 레시피를 요약 표시하는 카드다.
+ * - 제목, 설명, 공개 상태, 조회/좋아요 같은 메타 정보를 한 번에 보여준다.
+ * - Pressable로 감싸 상세 화면 이동 같은 상위 액션을 연결한다.
+ */
 export function RecipeCard({ recipe, theme, onPress }: RecipeCardProps) {
   return (
     <Pressable

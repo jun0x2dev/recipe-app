@@ -1,0 +1,18 @@
+spring:
+  application:
+    name: recipe-app
+  profiles:
+    active: local
+
+server:
+  port: 8089
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+
+oauth:
+  naver:
+    profile-uri: https://openapi.naver.com/v1/nid/me
