@@ -23,3 +23,7 @@ jwt:
 oauth:
   naver:
     profile-uri: https://openapi.naver.com/v1/nid/me
+  google:
+    token-info-uri: https://oauth2.googleapis.com/tokeninfo
+    allowed-audiences:
+      - change-me-google-web-client-id.apps.googleusercontent.com

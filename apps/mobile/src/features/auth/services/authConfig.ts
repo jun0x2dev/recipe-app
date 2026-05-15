@@ -11,6 +11,7 @@ type AppExtra = {
   naverClientId?: string;
   naverClientSecret?: string;
   naverUrlScheme?: string;
+  googleWebClientId?: string;
 };
 
 const extra = (Constants.expoConfig?.extra ?? {}) as AppExtra;
@@ -42,4 +43,6 @@ export const authConfig = {
   naverClientId: process.env.EXPO_PUBLIC_NAVER_CLIENT_ID ?? extra.naverClientId ?? '',
   naverClientSecret: process.env.EXPO_PUBLIC_NAVER_CLIENT_SECRET ?? extra.naverClientSecret ?? '',
   naverUrlScheme: process.env.EXPO_PUBLIC_NAVER_URL_SCHEME ?? extra.naverUrlScheme ?? 'com.leejun.recipeapp',
+  googleWebClientId:
+    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? extra.googleWebClientId ?? '',
 };

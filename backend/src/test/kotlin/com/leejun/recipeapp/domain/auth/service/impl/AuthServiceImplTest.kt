@@ -1,6 +1,7 @@
 package com.leejun.recipeapp.domain.auth.service.impl
 
 import com.leejun.recipeapp.domain.auth.dto.LoginRequest
+import com.leejun.recipeapp.domain.auth.dto.GoogleLoginRequest
 import com.leejun.recipeapp.domain.auth.dto.NaverLoginRequest
 import com.leejun.recipeapp.domain.auth.dto.RefreshTokenRequest
 import com.leejun.recipeapp.domain.auth.dto.SignUpRequest
@@ -9,6 +10,8 @@ import com.leejun.recipeapp.domain.auth.entity.RefreshToken
 import com.leejun.recipeapp.domain.auth.entity.User
 import com.leejun.recipeapp.domain.auth.entity.UserAuthProvider
 import com.leejun.recipeapp.domain.auth.entity.UserStatus
+import com.leejun.recipeapp.domain.auth.oauth.GoogleProfile
+import com.leejun.recipeapp.domain.auth.oauth.GoogleTokenVerifier
 import com.leejun.recipeapp.domain.auth.oauth.NaverProfile
 import com.leejun.recipeapp.domain.auth.oauth.NaverProfileClient
 import com.leejun.recipeapp.domain.auth.repository.RefreshTokenRepository
@@ -39,6 +42,7 @@ class AuthServiceImplTest {
     private lateinit var userRepository: UserRepository
     private lateinit var refreshTokenRepository: RefreshTokenRepository
     private lateinit var userAuthProviderRepository: UserAuthProviderRepository
+    private lateinit var googleTokenVerifier: GoogleTokenVerifier
     private lateinit var naverProfileClient: NaverProfileClient
     private lateinit var authService: AuthServiceImpl
 
@@ -59,12 +63,14 @@ class AuthServiceImplTest {
         userRepository = mockk()
         refreshTokenRepository = mockk()
         userAuthProviderRepository = mockk()
+        googleTokenVerifier = mockk()
         naverProfileClient = mockk()
         every { refreshTokenRepository.save(any<RefreshToken>()) } answers { firstArg<RefreshToken>() }
         authService = AuthServiceImpl(
             userRepository = userRepository,
             refreshTokenRepository = refreshTokenRepository,
             userAuthProviderRepository = userAuthProviderRepository,
+            googleTokenVerifier = googleTokenVerifier,
             naverProfileClient = naverProfileClient,
             passwordEncoder = passwordEncoder,
             jwtProvider = jwtProvider,
@@ -300,6 +306,128 @@ class AuthServiceImplTest {
 
         val exception = assertThrows(CustomException::class.java) {
             authService.loginWithNaver(NaverLoginRequest("suspended-token"))
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ErrorCode.USER_NOT_ACTIVE)
+        verify(exactly = 0) { refreshTokenRepository.save(any<RefreshToken>()) }
+    }
+
+    /**
+     * - Google 제공자 연결이 이미 있으면 새 사용자를 만들지 않고 기존 사용자로 로그인한다.
+     * - providerUserId는 Google sub claim이며 이메일보다 우선하는 매칭 기준이다.
+     */
+    @Test
+    fun `google login returns tokens for existing linked user`() {
+        val profile = GoogleProfile(
+            providerUserId = "google-sub",
+            email = "google@example.com",
+            emailVerified = true,
+            nickname = "google-user",
+            profileImageUrl = "https://example.com/google.png"
+        )
+        val user = User.createSocialUser(
+            email = profile.email,
+            nickname = profile.nickname,
+            profileImageUrl = profile.profileImageUrl
+        )
+        val provider = UserAuthProvider.create(
+            user = user,
+            provider = AuthProvider.GOOGLE,
+            providerUserId = profile.providerUserId,
+            providerEmail = profile.email,
+            emailVerified = true
+        )
+
+        every { googleTokenVerifier.verify("google-id-token") } returns profile
+        every {
+            userAuthProviderRepository.findByProviderAndProviderUserId(AuthProvider.GOOGLE, profile.providerUserId)
+        } returns Optional.of(provider)
+
+        val response = authService.loginWithGoogle(GoogleLoginRequest("google-id-token"))
+
+        assertThat(response.accessToken).isNotBlank()
+        assertThat(response.refreshToken).isNotBlank()
+        assertThat(jwtProvider.getRole(response.accessToken)).isEqualTo("USER")
+        verify(exactly = 0) { userRepository.save(any<User>()) }
+        verify(exactly = 0) { userAuthProviderRepository.save(any<UserAuthProvider>()) }
+        verify { refreshTokenRepository.save(any<RefreshToken>()) }
+    }
+
+    /**
+     * - Google 제공자 연결이 없으면 내부 사용자와 GOOGLE 연결 정보를 함께 생성한다.
+     * - Google email_verified 값은 provider 연결 레코드에 보존한다.
+     */
+    @Test
+    fun `google login creates user and provider link when first login`() {
+        val profile = GoogleProfile(
+            providerUserId = "new-google-sub",
+            email = "new-google@example.com",
+            emailVerified = true,
+            nickname = "new-google-user",
+            profileImageUrl = null
+        )
+
+        every { googleTokenVerifier.verify("new-google-id-token") } returns profile
+        every {
+            userAuthProviderRepository.findByProviderAndProviderUserId(AuthProvider.GOOGLE, profile.providerUserId)
+        } returns Optional.empty()
+        every { userRepository.save(any<User>()) } answers { firstArg<User>() }
+        every { userAuthProviderRepository.save(any<UserAuthProvider>()) } answers { firstArg<UserAuthProvider>() }
+
+        val response = authService.loginWithGoogle(GoogleLoginRequest("new-google-id-token"))
+
+        assertThat(response.accessToken).isNotBlank()
+        assertThat(response.refreshToken).isNotBlank()
+        verify {
+            userRepository.save(match {
+                it.email == profile.email &&
+                    it.nickname == profile.nickname &&
+                    it.password == null
+            })
+        }
+        verify {
+            userAuthProviderRepository.save(match {
+                it.provider == AuthProvider.GOOGLE &&
+                    it.providerUserId == profile.providerUserId &&
+                    it.providerEmail == profile.email &&
+                    it.emailVerified
+            })
+        }
+    }
+
+    /**
+     * - Google provider 연결이 있더라도 내부 사용자 상태가 ACTIVE가 아니면 로그인을 막는다.
+     * - 정지 또는 삭제 계정은 새 JWT를 발급받을 수 없어야 한다.
+     */
+    @Test
+    fun `google login rejects inactive linked user`() {
+        val profile = GoogleProfile(
+            providerUserId = "deleted-google-sub",
+            email = "deleted-google@example.com",
+            emailVerified = true,
+            nickname = "deleted-google-user",
+            profileImageUrl = null
+        )
+        val user = User.createSocialUser(
+            email = profile.email,
+            nickname = profile.nickname,
+            status = UserStatus.DELETED
+        )
+        val provider = UserAuthProvider.create(
+            user = user,
+            provider = AuthProvider.GOOGLE,
+            providerUserId = profile.providerUserId,
+            providerEmail = profile.email,
+            emailVerified = true
+        )
+
+        every { googleTokenVerifier.verify("deleted-google-token") } returns profile
+        every {
+            userAuthProviderRepository.findByProviderAndProviderUserId(AuthProvider.GOOGLE, profile.providerUserId)
+        } returns Optional.of(provider)
+
+        val exception = assertThrows(CustomException::class.java) {
+            authService.loginWithGoogle(GoogleLoginRequest("deleted-google-token"))
         }
 
         assertThat(exception.errorCode).isEqualTo(ErrorCode.USER_NOT_ACTIVE)
