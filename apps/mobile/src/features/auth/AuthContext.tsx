@@ -8,11 +8,27 @@ import { AuthState, TokenResponse } from './types/auth';
  * - 추후 expo-secure-store 도입 시 이 계층에서 영속 저장을 담당한다.
  */
 type AuthContextValue = AuthState & {
+  userId: string | null;
   signIn: (tokenResponse: TokenResponse) => void;
   signOut: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+/**
+ * - JWT payload에서 userId claim을 추출한다.
+ * - base64url 디코딩으로 외부 라이브러리 없이 처리한다.
+ */
+function extractUserIdFromToken(accessToken: string): string | null {
+  try {
+    const payload = accessToken.split('.')[1];
+    const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    const claims = JSON.parse(decoded);
+    return claims.userId != null ? String(claims.userId) : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * - 인증 상태 Provider다.
@@ -25,6 +41,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const value = useMemo<AuthContextValue>(
     () => ({
       tokenResponse,
+      userId: tokenResponse ? extractUserIdFromToken(tokenResponse.accessToken) : null,
       signIn: setTokenResponse,
       signOut: () => setTokenResponse(null),
     }),

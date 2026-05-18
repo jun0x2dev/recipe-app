@@ -1,43 +1,99 @@
-import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { useFocusEffect, router } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { AppButton } from '../../../components/AppButton';
 import { Screen } from '../../../components/Screen';
+import { useAuth } from '../../auth/AuthContext';
 import { useAppTheme } from '../../../theme/useAppTheme';
 import { RecipeCard } from '../components/RecipeCard';
-import { mockRecipes } from '../data/mockRecipes';
+import { fetchMyRecipes } from '../services/recipeApi';
+import { Recipe } from '../types/recipe';
+
+const PAGE_SIZE = 20;
+const SEARCH_DEBOUNCE_MS = 400;
 
 /**
  * - 사용자의 레시피 목록을 보여주는 화면이다.
- * - mock 데이터 기반으로 검색, 공개 개수 요약, 상세 이동을 제공한다.
- * - 백엔드 API 연결 전까지 MVP 화면 흐름을 검증하는 기준 화면이다.
+ * - 백엔드 API에서 페이징 조회하고 검색, pull-to-refresh, 무한 스크롤을 지원한다.
  */
 export function RecipeListScreen() {
   const theme = useAppTheme();
+  const { tokenResponse } = useAuth();
+
   const [keyword, setKeyword] = useState('');
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
 
-  /**
-   * - 검색어에 맞는 레시피 목록을 계산한다.
-   * - 제목, 설명, 재료를 대상으로 대소문자 구분 없이 필터링한다.
-   * - 검색어가 비어 있으면 전체 mock 데이터를 반환한다.
-   */
-  const recipes = useMemo(() => {
-    const normalizedKeyword = keyword.trim().toLowerCase();
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    if (!normalizedKeyword) {
-      return mockRecipes;
-    }
+  const loadRecipes = useCallback(
+    async (pageNumber: number, searchKeyword: string, append: boolean) => {
+      if (!tokenResponse?.accessToken) return;
 
-    return mockRecipes.filter((recipe) =>
-      [recipe.title, recipe.description, ...recipe.ingredients].some((text) =>
-        text.toLowerCase().includes(normalizedKeyword),
-      ),
-    );
-  }, [keyword]);
+      try {
+        const result = await fetchMyRecipes(tokenResponse.accessToken, {
+          keyword: searchKeyword || undefined,
+          page: pageNumber,
+          size: PAGE_SIZE,
+        });
+
+        setRecipes((prev) => (append ? [...prev, ...result.content] : result.content));
+        setTotalCount(result.totalElements);
+        setHasMore(!result.last);
+        setPage(pageNumber);
+      } catch {
+        // 조회 실패 시 기존 데이터 유지
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    },
+    [tokenResponse?.accessToken],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      setIsLoading(true);
+      loadRecipes(0, keyword, false);
+    }, [loadRecipes, keyword]),
+  );
+
+  const handleSearch = (text: string) => {
+    setKeyword(text);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      setIsLoading(true);
+      loadRecipes(0, text, false);
+    }, SEARCH_DEBOUNCE_MS);
+  };
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    loadRecipes(0, keyword, false);
+  };
+
+  const handleLoadMore = () => {
+    if (!hasMore || isLoading) return;
+    loadRecipes(page + 1, keyword, true);
+  };
+
+  const publicCount = recipes.filter((recipe) => recipe.visibility === 'public').length;
 
   return (
-    <Screen theme={theme}>
+    <Screen theme={theme} scroll={false}>
       <View style={styles.header}>
         <View>
           <Text style={[styles.kicker, { color: theme.textMuted }]}>내가 기록한 요리</Text>
@@ -47,30 +103,46 @@ export function RecipeListScreen() {
       </View>
 
       <TextInput
-        placeholder="요리명, 재료로 검색"
+        placeholder="요리명으로 검색"
         placeholderTextColor={theme.textMuted}
         value={keyword}
-        onChangeText={setKeyword}
+        onChangeText={handleSearch}
         style={[styles.searchInput, { backgroundColor: theme.surfaceMuted, color: theme.text }]}
       />
 
       <View style={[styles.summaryBox, { backgroundColor: theme.surfaceMuted }]}>
-        <Text style={[styles.summaryNumber, { color: theme.text }]}>{recipes.length}</Text>
+        <Text style={[styles.summaryNumber, { color: theme.text }]}>{totalCount}</Text>
         <Text style={[styles.summary, { color: theme.textMuted }]}>
-          저장된 레시피, 공개 {recipes.filter((recipe) => recipe.visibility === 'public').length}개
+          저장된 레시피, 공개 {publicCount}개
         </Text>
       </View>
 
-      <View style={styles.list}>
-        {recipes.map((recipe) => (
-          <RecipeCard
-            key={recipe.id}
-            recipe={recipe}
-            theme={theme}
-            onPress={() => router.push(`/recipes/${recipe.id}`)}
-          />
-        ))}
-      </View>
+      {isLoading && recipes.length === 0 ? (
+        <ActivityIndicator style={styles.loader} color={theme.textMuted} />
+      ) : (
+        <FlatList
+          data={recipes}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <RecipeCard
+              recipe={item}
+              theme={theme}
+              onPress={() => router.push(`/recipes/${item.id}`)}
+            />
+          )}
+          contentContainerStyle={styles.list}
+          refreshControl={
+            <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
+          }
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          ListEmptyComponent={
+            <Text style={[styles.empty, { color: theme.textMuted }]}>
+              레시피가 없습니다. 첫 레시피를 작성해보세요!
+            </Text>
+          }
+        />
+      )}
     </Screen>
   );
 }
@@ -81,6 +153,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 16,
     justifyContent: 'space-between',
+    marginBottom: 16,
   },
   kicker: {
     fontSize: 13,
@@ -94,12 +167,14 @@ const styles = StyleSheet.create({
   searchInput: {
     borderRadius: 14,
     fontSize: 16,
+    marginBottom: 16,
     minHeight: 52,
     paddingHorizontal: 16,
   },
   summaryBox: {
     borderRadius: 16,
     gap: 2,
+    marginBottom: 16,
     padding: 18,
   },
   summaryNumber: {
@@ -112,5 +187,14 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: 12,
+    paddingBottom: 20,
+  },
+  loader: {
+    marginTop: 40,
+  },
+  empty: {
+    fontSize: 15,
+    marginTop: 40,
+    textAlign: 'center',
   },
 });

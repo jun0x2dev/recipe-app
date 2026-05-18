@@ -1,43 +1,98 @@
-import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useFocusEffect, router } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { Screen } from '../../../components/Screen';
+import { useAuth } from '../../auth/AuthContext';
 import { useAppTheme } from '../../../theme/useAppTheme';
 import { RecipeCard } from '../../recipes/components/RecipeCard';
-import { mockRecipes } from '../../recipes/data/mockRecipes';
+import { fetchPublicRecipes } from '../../recipes/services/recipeApi';
+import { Recipe } from '../../recipes/types/recipe';
+
+const PAGE_SIZE = 20;
+const SEARCH_DEBOUNCE_MS = 400;
 
 /**
- * - 다른 사용자의 공개 레시피를 둘러보는 화면이다.
- * - MVP 단계에서는 mock 데이터 중 공개 레시피만 사용한다.
- * - 추후 공개 레시피 API, 정렬, 검색, 저장 기능을 이 화면에 연결한다.
+ * - 공개 레시피를 둘러보는 화면이다.
+ * - 백엔드 공개 레시피 API에서 페이징 조회한다.
  */
 export function ExploreRecipeScreen() {
   const theme = useAppTheme();
+  const { tokenResponse } = useAuth();
+
   const [keyword, setKeyword] = useState('');
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
 
-  /**
-   * - 공개 레시피 중 검색어에 맞는 항목만 계산한다.
-   * - 제목, 설명, 재료를 대상으로 대소문자 구분 없이 필터링한다.
-   * - 실제 API 연결 후에도 화면 입력 상태는 같은 방식으로 유지한다.
-   */
-  const recipes = useMemo(() => {
-    const normalizedKeyword = keyword.trim().toLowerCase();
-    const publicRecipes = mockRecipes.filter((recipe) => recipe.visibility === 'public');
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    if (!normalizedKeyword) {
-      return publicRecipes;
-    }
+  const loadRecipes = useCallback(
+    async (pageNumber: number, searchKeyword: string, append: boolean) => {
+      if (!tokenResponse?.accessToken) return;
 
-    return publicRecipes.filter((recipe) =>
-      [recipe.title, recipe.description, ...recipe.ingredients].some((text) =>
-        text.toLowerCase().includes(normalizedKeyword),
-      ),
-    );
-  }, [keyword]);
+      try {
+        const result = await fetchPublicRecipes(tokenResponse.accessToken, {
+          keyword: searchKeyword || undefined,
+          page: pageNumber,
+          size: PAGE_SIZE,
+        });
 
-  return (
-    <Screen theme={theme}>
+        setRecipes((prev) => (append ? [...prev, ...result.content] : result.content));
+        setHasMore(!result.last);
+        setPage(pageNumber);
+      } catch {
+        // 조회 실패 시 기존 데이터 유지
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    },
+    [tokenResponse?.accessToken],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      setIsLoading(true);
+      loadRecipes(0, keyword, false);
+    }, [loadRecipes, keyword]),
+  );
+
+  const handleSearch = (text: string) => {
+    setKeyword(text);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      setIsLoading(true);
+      loadRecipes(0, text, false);
+    }, SEARCH_DEBOUNCE_MS);
+  };
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    loadRecipes(0, keyword, false);
+  };
+
+  const handleLoadMore = () => {
+    if (!hasMore || isLoading) return;
+    loadRecipes(page + 1, keyword, true);
+  };
+
+  const featured = recipes[0];
+  const restRecipes = recipes.slice(1);
+
+  const ListHeader = (
+    <>
       <View style={styles.header}>
         <Text style={[styles.kicker, { color: theme.textMuted }]}>오늘의 공개 레시피</Text>
         <Text style={[styles.title, { color: theme.text }]}>둘러보기</Text>
@@ -47,42 +102,66 @@ export function ExploreRecipeScreen() {
         placeholder="공개 레시피 검색"
         placeholderTextColor={theme.textMuted}
         value={keyword}
-        onChangeText={setKeyword}
+        onChangeText={handleSearch}
         style={[styles.searchInput, { backgroundColor: theme.surfaceMuted, color: theme.text }]}
       />
 
-      {recipes[0] ? (
+      {featured ? (
         <PressableFeatured
-          title={recipes[0].title}
-          description={recipes[0].description}
-          cookingTimeMinutes={recipes[0].cookingTimeMinutes}
+          title={featured.title}
+          description={featured.description}
+          cookingTimeMinutes={featured.cookingTimeMinutes}
           themeText={theme.text}
           themeMuted={theme.textMuted}
           themeSurface={theme.surfaceMuted}
-          onPress={() => router.push(`/recipes/${recipes[0].id}`)}
+          onPress={() => router.push(`/recipes/${featured.id}`)}
         />
       ) : null}
 
-      <Text style={[styles.sectionTitle, { color: theme.text }]}>최근 올라온 레시피</Text>
-      <View style={styles.list}>
-        {recipes.slice(1).map((recipe) => (
-          <RecipeCard
-            key={recipe.id}
-            recipe={recipe}
-            theme={theme}
-            onPress={() => router.push(`/recipes/${recipe.id}`)}
-          />
-        ))}
-      </View>
+      {restRecipes.length > 0 ? (
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>최근 올라온 레시피</Text>
+      ) : null}
+    </>
+  );
+
+  return (
+    <Screen theme={theme} scroll={false}>
+      {isLoading && recipes.length === 0 ? (
+        <>
+          {ListHeader}
+          <ActivityIndicator style={styles.loader} color={theme.textMuted} />
+        </>
+      ) : (
+        <FlatList
+          data={restRecipes}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <RecipeCard
+              recipe={item}
+              theme={theme}
+              onPress={() => router.push(`/recipes/${item.id}`)}
+            />
+          )}
+          ListHeaderComponent={ListHeader}
+          contentContainerStyle={styles.list}
+          refreshControl={
+            <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
+          }
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          ListEmptyComponent={
+            !featured ? (
+              <Text style={[styles.empty, { color: theme.textMuted }]}>
+                아직 공개된 레시피가 없습니다.
+              </Text>
+            ) : null
+          }
+        />
+      )}
     </Screen>
   );
 }
 
-/**
- * - 둘러보기 화면 상단에 노출하는 대표 공개 레시피 카드 props다.
- * - 일반 목록 카드보다 큰 영역으로 오늘의 추천처럼 보이게 한다.
- * - 실제 추천 API가 붙기 전까지 첫 번째 공개 mock 레시피를 표시한다.
- */
 type PressableFeaturedProps = {
   title: string;
   description: string;
@@ -93,11 +172,6 @@ type PressableFeaturedProps = {
   onPress: () => void;
 };
 
-/**
- * - 공개 레시피 피드의 대표 카드다.
- * - 이미지를 붙이기 전까지 중립색 썸네일 영역과 큰 제목으로 시각 계층을 만든다.
- * - 탭 진입 직후 목록 복제처럼 보이지 않게 화면 리듬을 바꾼다.
- */
 function PressableFeatured({
   title,
   description,
@@ -131,6 +205,7 @@ function PressableFeatured({
 const styles = StyleSheet.create({
   header: {
     gap: 6,
+    marginBottom: 16,
   },
   kicker: {
     fontSize: 13,
@@ -144,12 +219,14 @@ const styles = StyleSheet.create({
   searchInput: {
     borderRadius: 14,
     fontSize: 16,
+    marginBottom: 16,
     minHeight: 52,
     paddingHorizontal: 16,
   },
   featured: {
     borderRadius: 22,
     gap: 8,
+    marginBottom: 16,
     padding: 20,
   },
   featuredImage: {
@@ -183,8 +260,19 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '900',
+    marginBottom: 12,
   },
   list: {
     gap: 12,
+    padding: 24,
+    paddingBottom: 36,
+  },
+  loader: {
+    marginTop: 40,
+  },
+  empty: {
+    fontSize: 15,
+    marginTop: 40,
+    textAlign: 'center',
   },
 });

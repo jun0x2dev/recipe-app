@@ -1,27 +1,81 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '../../../components/Screen';
+import { useAuth } from '../../auth/AuthContext';
 import { useAppTheme } from '../../../theme/useAppTheme';
 import { VisibilityBadge } from '../components/VisibilityBadge';
-import { mockRecipes } from '../data/mockRecipes';
+import { deleteRecipe, fetchRecipe } from '../services/recipeApi';
+import { Recipe } from '../types/recipe';
 
-/**
- * - 레시피 상세 화면 props다.
- * - recipeId는 Expo Router 동적 경로에서 전달된다.
- * - 값이 없거나 일치하는 데이터가 없으면 not found 상태를 표시한다.
- */
 type RecipeDetailScreenProps = {
   recipeId?: string;
 };
 
 /**
- * - 선택된 레시피의 상세 정보를 보여주는 화면이다.
- * - mock 데이터에서 recipeId로 레시피를 찾아 렌더링한다.
- * - 재료와 조리 단계는 읽기 전용 목록으로 표시한다.
+ * - 레시피 상세를 API에서 조회해 보여주는 화면이다.
+ * - 본인 레시피인 경우 수정/삭제 버튼을 표시한다.
  */
 export function RecipeDetailScreen({ recipeId }: RecipeDetailScreenProps) {
   const theme = useAppTheme();
-  const recipe = mockRecipes.find((item) => item.id === recipeId);
+  const { tokenResponse, userId } = useAuth();
+  const [recipe, setRecipe] = useState<Recipe | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!recipeId || !tokenResponse?.accessToken) {
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      fetchRecipe(tokenResponse.accessToken, recipeId)
+        .then(setRecipe)
+        .catch(() => setRecipe(null))
+        .finally(() => setIsLoading(false));
+    }, [recipeId, tokenResponse?.accessToken]),
+  );
+
+  const isOwner = recipe != null && userId != null && recipe.userId === userId;
+
+  const handleDelete = () => {
+    if (!tokenResponse?.accessToken || !recipeId) return;
+
+    Alert.alert('레시피 삭제', '이 레시피를 삭제하시겠습니까?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            setIsDeleting(true);
+            await deleteRecipe(tokenResponse.accessToken, recipeId);
+            Alert.alert('삭제 완료', '레시피가 삭제되었습니다.');
+            router.back();
+          } catch (error) {
+            Alert.alert(
+              '삭제 실패',
+              error instanceof Error ? error.message : '레시피 삭제 중 오류가 발생했습니다.',
+            );
+          } finally {
+            setIsDeleting(false);
+          }
+        },
+      },
+    ]);
+  };
+
+  if (isLoading) {
+    return (
+      <Screen theme={theme}>
+        <ActivityIndicator style={styles.loader} color={theme.textMuted} />
+      </Screen>
+    );
+  }
 
   if (!recipe) {
     return (
@@ -47,24 +101,56 @@ export function RecipeDetailScreen({ recipeId }: RecipeDetailScreenProps) {
         </View>
       </View>
 
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>재료</Text>
-        {recipe.ingredients.map((ingredient) => (
-          <Text key={ingredient} style={[styles.listItem, { color: theme.textMuted }]}>
-            {ingredient}
-          </Text>
-        ))}
-      </View>
+      {recipe.ingredients.length > 0 ? (
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>재료</Text>
+          {recipe.ingredients.map((ingredient, index) => (
+            <Text key={`${ingredient}-${index}`} style={[styles.listItem, { color: theme.textMuted }]}>
+              {ingredient}
+            </Text>
+          ))}
+        </View>
+      ) : null}
 
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>조리 방법</Text>
-        {recipe.steps.map((step, index) => (
-          <View key={step} style={styles.stepRow}>
-            <Text style={[styles.stepNumber, { color: theme.text }]}>{index + 1}</Text>
-            <Text style={[styles.stepText, { color: theme.textMuted }]}>{step}</Text>
-          </View>
-        ))}
-      </View>
+      {recipe.steps.length > 0 ? (
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>조리 방법</Text>
+          {recipe.steps.map((step, index) => (
+            <View key={`${step}-${index}`} style={styles.stepRow}>
+              <Text style={[styles.stepNumber, { color: theme.text }]}>{index + 1}</Text>
+              <Text style={[styles.stepText, { color: theme.textMuted }]}>{step}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {isOwner ? (
+        <View style={styles.actions}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push(`/recipes/${recipeId}/edit`)}
+            style={({ pressed }) => [
+              styles.actionButton,
+              { backgroundColor: theme.surfaceMuted, opacity: pressed ? 0.78 : 1 },
+            ]}
+          >
+            <Text style={[styles.actionButtonText, { color: theme.text }]}>수정</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            disabled={isDeleting}
+            onPress={handleDelete}
+            style={({ pressed }) => [
+              styles.actionButton,
+              { backgroundColor: theme.surfaceMuted, opacity: isDeleting ? 0.5 : pressed ? 0.78 : 1 },
+            ]}
+          >
+            <Text style={[styles.actionButtonText, { color: theme.danger }]}>
+              {isDeleting ? '삭제 중...' : '삭제'}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
     </Screen>
   );
 }
@@ -125,5 +211,23 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     lineHeight: 23,
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  actionButton: {
+    alignItems: 'center',
+    borderRadius: 14,
+    flex: 1,
+    minHeight: 48,
+    justifyContent: 'center',
+  },
+  actionButtonText: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  loader: {
+    marginTop: 40,
   },
 });
