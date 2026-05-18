@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "recipe-ai-worker"
+version = "0.1.0"
+description = "AI worker prototype for extracting recipe metadata from YouTube Shorts."
+requires-python = ">=3.9"
+dependencies = [
+  "yt-dlp>=2025.1.15",
+]
+
+[project.optional-dependencies]
+stt = [
+  "faster-whisper>=1.1.1",
+]
+api = [
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.30.0",
+]
+
+[project.scripts]
+recipe-extractor = "recipe_extractor.main:main"
+recipe-extractor-api = "recipe_extractor.api:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

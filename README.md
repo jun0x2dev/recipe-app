@@ -20,7 +20,7 @@ iOS 앱 출시를 목표로 하는 레시피 앱 사이드 프로젝트입니다
 - Backend: Spring Boot, Kotlin
 - Database: PostgreSQL
 - Storage: AWS S3
-- AI: 추후 결정
+- AI: Python worker, Whisper/OCR/LLM 후보 검토
 - Infrastructure: 추후 구성
 
 ## 프로젝트 구조
@@ -29,6 +29,7 @@ iOS 앱 출시를 목표로 하는 레시피 앱 사이드 프로젝트입니다
 recipe-app/
   apps/
     mobile/
+  ai-worker/
   backend/
   docs/
   infra/
@@ -41,4 +42,3 @@ recipe-app/
 3. 데이터베이스 및 파일 업로드 기능 추가
 4. AI 기반 레시피 추출 기능 추가
 5. 인프라 및 배포 환경 구성
-

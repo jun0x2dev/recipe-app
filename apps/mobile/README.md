@@ -68,6 +68,9 @@ apps/mobile/                         - 모바일 앱 루트
           VisibilityBadge.tsx        - 공개/비공개 배지
         data/                        - 백엔드 연동 전 mock 데이터
           mockRecipes.ts             - 레시피 mock 데이터
+        services/                    - 레시피 백엔드 API 호출
+          aiRecipeApi.ts             - AI Worker 레시피 초안 생성 API 클라이언트
+          recipeApi.ts               - 레시피 생성 API 클라이언트
         screens/                     - 레시피 화면 컴포넌트
           RecipeCreateScreen.tsx     - 레시피 작성 화면
           RecipeDetailScreen.tsx     - 레시피 상세 화면
@@ -92,7 +95,7 @@ apps/mobile/                         - 모바일 앱 루트
 - 공개 레시피 둘러보기
 - 설정
 - 레시피 상세
-- 레시피 작성
+- 레시피 작성, 재료/단계 행 추가 입력, AI 초안 채우기, 생성 API 호출
 - 라이트/다크/시스템 화면 모드 선택
 - mock 데이터 기반 화면 흐름
 
@@ -114,6 +117,7 @@ SDK가 설치되지 않은 브라우저 확인 환경에서는 plugin 등록을 
 ```bash
 EXPO_PUBLIC_NAVER_CLIENT_SECRET=네이버_클라이언트_시크릿
 EXPO_PUBLIC_API_BASE_URL=http://localhost:8089
+EXPO_PUBLIC_AI_WORKER_BASE_URL=http://localhost:8001
 ```
 
 실기기에서 로컬 백엔드에 접근할 때는 `EXPO_PUBLIC_API_BASE_URL`을 PC의 LAN IP로 지정합니다.
