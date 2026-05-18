@@ -25,15 +25,60 @@ export type Recipe = {
 };
 
 /**
+ * - 백엔드 레시피 생성 API에 전달하는 단일 재료 요청이다.
+ * - amount는 사용자가 계량을 입력하지 않을 수 있어 null을 허용한다.
+ */
+export type CreateRecipeIngredientRequest = {
+  name: string;
+  amount: string | null;
+};
+
+/**
+ * - 백엔드 레시피 생성 API에 전달하는 단일 조리 단계 요청이다.
+ */
+export type CreateRecipeStepRequest = {
+  description: string;
+};
+
+/**
+ * - 백엔드 레시피 생성 API 요청 타입이다.
+ * - 모바일 작성 폼의 문자열 입력값을 저장 가능한 구조로 변환한 결과다.
+ */
+export type CreateRecipeRequest = {
+  title: string;
+  description: string | null;
+  cookingTimeMinutes: number | null;
+  visibility: 'PUBLIC' | 'PRIVATE';
+  ingredients: CreateRecipeIngredientRequest[];
+  steps: CreateRecipeStepRequest[];
+};
+
+/**
+ * - 레시피 작성 화면의 단일 재료 입력 상태다.
+ * - UI에서 재료명과 계량을 별도 입력칸으로 관리한다.
+ */
+export type RecipeDraftIngredient = {
+  name: string;
+  amount: string;
+};
+
+/**
+ * - 레시피 작성 화면의 단일 조리 단계 입력 상태다.
+ */
+export type RecipeDraftStep = {
+  description: string;
+};
+
+/**
  * - 레시피 작성 화면의 입력 상태 타입이다.
- * - TextInput 값은 문자열로 관리하고 저장 시 숫자/배열로 변환한다.
- * - ingredientsText와 stepsText는 줄바꿈 기반 입력을 전제로 한다.
+ * - TextInput 값은 문자열로 관리하고 저장 시 숫자로 변환한다.
+ * - 재료와 조리 단계는 추가/삭제 가능한 배열 입력 UI로 관리한다.
  */
 export type RecipeDraft = {
   title: string;
   description: string;
   cookingTimeMinutes: string;
   visibility: RecipeVisibility;
-  ingredientsText: string;
-  stepsText: string;
+  ingredients: RecipeDraftIngredient[];
+  steps: RecipeDraftStep[];
 };
