@@ -11,6 +11,7 @@ import java.time.LocalDateTime
  */
 data class RecipeResponse(
     val id: Long,
+    val userId: Long,
     val title: String,
     val description: String?,
     val cookingTimeMinutes: Int?,
@@ -30,6 +31,7 @@ data class RecipeResponse(
         fun from(recipe: Recipe): RecipeResponse =
             RecipeResponse(
                 id = recipe.id,
+                userId = recipe.user.id,
                 title = recipe.title,
                 description = recipe.description,
                 cookingTimeMinutes = recipe.cookingTimeMinutes,

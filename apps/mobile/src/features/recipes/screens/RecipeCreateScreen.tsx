@@ -1,15 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { useState } from 'react';
-import { Alert, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AppButton } from '../../../components/AppButton';
 import { Screen } from '../../../components/Screen';
 import { useAuth } from '../../auth/AuthContext';
 import { AppTheme, useAppTheme } from '../../../theme/useAppTheme';
 import { extractRecipeDraftFromYoutube } from '../services/aiRecipeApi';
-import { createRecipe } from '../services/recipeApi';
+import { createRecipe, fetchRecipe, updateRecipe } from '../services/recipeApi';
 import {
   CreateRecipeRequest,
   RecipeDraft,
@@ -33,18 +33,58 @@ const initialDraft: RecipeDraft = {
 };
 
 /**
- * - 레시피 작성 화면이다.
- * - 제목, 설명, 조리 시간, 공개 여부, 재료, 조리 단계를 입력받는다.
- * - 현재 저장 동작은 백엔드 연결 전 임시 안내 후 이전 화면으로 돌아간다.
+ * - 레시피 작성/수정 화면이다.
+ * - recipeId가 전달되면 수정 모드로 동작한다.
  */
-export function RecipeCreateScreen() {
+type RecipeCreateScreenProps = {
+  recipeId?: string;
+};
+
+export function RecipeCreateScreen({ recipeId }: RecipeCreateScreenProps) {
+  const isEditMode = !!recipeId;
   const theme = useAppTheme();
   const { tokenResponse } = useAuth();
   const [draft, setDraft] = useState<RecipeDraft>(initialDraft);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingRecipe, setIsLoadingRecipe] = useState(isEditMode);
   const [isAiModalVisible, setIsAiModalVisible] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
+
+  /**
+   * - 수정 모드에서 기존 레시피 데이터를 불러와 폼에 채운다.
+   */
+  useEffect(() => {
+    if (!isEditMode || !tokenResponse?.accessToken || !recipeId) return;
+
+    fetchRecipe(tokenResponse.accessToken, recipeId)
+      .then((recipe) => {
+        setDraft({
+          title: recipe.title,
+          description: recipe.description,
+          cookingTimeMinutes: recipe.cookingTimeMinutes ? String(recipe.cookingTimeMinutes) : '',
+          visibility: recipe.visibility,
+          ingredients:
+            recipe.ingredients.length > 0
+              ? recipe.ingredients.map((text) => {
+                  const parts = text.split(' ');
+                  const name = parts[0] || '';
+                  const amount = parts.slice(1).join(' ');
+                  return { name, amount };
+                })
+              : [{ name: '', amount: '' }],
+          steps:
+            recipe.steps.length > 0
+              ? recipe.steps.map((description) => ({ description }))
+              : [{ description: '' }],
+        });
+      })
+      .catch(() => {
+        Alert.alert('불러오기 실패', '레시피 정보를 불러올 수 없습니다.');
+        router.back();
+      })
+      .finally(() => setIsLoadingRecipe(false));
+  }, [isEditMode, tokenResponse?.accessToken, recipeId]);
 
   /**
    * - 레시피 작성 draft의 일부 필드만 갱신한다.
@@ -145,12 +185,20 @@ export function RecipeCreateScreen() {
 
     try {
       setIsSaving(true);
-      await createRecipe(tokenResponse.accessToken, toCreateRecipeRequest(draft));
-      Alert.alert('저장 완료', '레시피가 저장되었습니다.');
+      const request = toCreateRecipeRequest(draft);
+
+      if (isEditMode && recipeId) {
+        await updateRecipe(tokenResponse.accessToken, recipeId, request);
+        Alert.alert('수정 완료', '레시피가 수정되었습니다.');
+      } else {
+        await createRecipe(tokenResponse.accessToken, request);
+        Alert.alert('저장 완료', '레시피가 저장되었습니다.');
+      }
+
       router.back();
     } catch (error) {
       Alert.alert(
-        '저장 실패',
+        isEditMode ? '수정 실패' : '저장 실패',
         error instanceof Error ? error.message : '레시피 저장 중 오류가 발생했습니다.',
       );
     } finally {
@@ -191,11 +239,23 @@ export function RecipeCreateScreen() {
     }
   };
 
+  if (isLoadingRecipe) {
+    return (
+      <Screen theme={theme}>
+        <ActivityIndicator style={{ marginTop: 40 }} color={theme.textMuted} />
+      </Screen>
+    );
+  }
+
   return (
     <Screen theme={theme}>
       <View style={styles.header}>
-        <Text style={[styles.kicker, { color: theme.textMuted }]}>레시피 작성</Text>
-        <Text style={[styles.title, { color: theme.text }]}>새 레시피</Text>
+        <Text style={[styles.kicker, { color: theme.textMuted }]}>
+          {isEditMode ? '레시피 수정' : '레시피 작성'}
+        </Text>
+        <Text style={[styles.title, { color: theme.text }]}>
+          {isEditMode ? '레시피 수정' : '새 레시피'}
+        </Text>
       </View>
 
       <Pressable
@@ -250,14 +310,17 @@ export function RecipeCreateScreen() {
         <View style={styles.basicRow}>
           <View style={styles.basicRowItem}>
             <Field label="조리 시간" themeTextColor={theme.text}>
-              <TextInput
-                keyboardType="number-pad"
-                placeholder="분"
-                placeholderTextColor={theme.textMuted}
-                value={draft.cookingTimeMinutes}
-                onChangeText={(cookingTimeMinutes) => updateDraft({ cookingTimeMinutes })}
-                style={[styles.input, { backgroundColor: theme.surfaceMuted, color: theme.text }]}
-              />
+              <View style={[styles.timeInputContainer, { backgroundColor: theme.surfaceMuted }]}>
+                <TextInput
+                  keyboardType="number-pad"
+                  placeholder="예: 20"
+                  placeholderTextColor={theme.textMuted}
+                  value={draft.cookingTimeMinutes}
+                  onChangeText={(cookingTimeMinutes) => updateDraft({ cookingTimeMinutes })}
+                  style={[styles.timeInput, { color: theme.text }]}
+                />
+                <Text style={[styles.timeUnit, { color: theme.textMuted }]}>분</Text>
+              </View>
             </Field>
           </View>
 
@@ -375,7 +438,7 @@ export function RecipeCreateScreen() {
       </Section>
 
       <AppButton
-        label={isSaving ? '작성 중...' : '작성 완료'}
+        label={isSaving ? (isEditMode ? '수정 중...' : '작성 중...') : (isEditMode ? '수정 완료' : '작성 완료')}
         theme={theme}
         disabled={isSaving}
         onPress={saveDraft}
@@ -630,6 +693,24 @@ const styles = StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: 14,
     paddingVertical: 12,
+  },
+  timeInputContainer: {
+    alignItems: 'center',
+    borderRadius: 14,
+    flexDirection: 'row',
+    minHeight: 48,
+    paddingHorizontal: 14,
+  },
+  timeInput: {
+    flex: 1,
+    fontSize: 16,
+    minHeight: 48,
+    paddingVertical: 12,
+  },
+  timeUnit: {
+    fontSize: 15,
+    fontWeight: '800',
+    paddingLeft: 8,
   },
   multiline: {
     minHeight: 96,

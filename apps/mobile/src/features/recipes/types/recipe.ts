@@ -12,6 +12,7 @@ export type RecipeVisibility = 'public' | 'private';
  */
 export type Recipe = {
   id: string;
+  userId: string;
   title: string;
   description: string;
   cookingTimeMinutes: number;
@@ -81,4 +82,24 @@ export type RecipeDraft = {
   visibility: RecipeVisibility;
   ingredients: RecipeDraftIngredient[];
   steps: RecipeDraftStep[];
+};
+
+/**
+ * - 레시피 수정 API 요청 타입이다.
+ * - 생성 요청과 동일한 구조를 사용한다.
+ */
+export type UpdateRecipeRequest = CreateRecipeRequest;
+
+/**
+ * - Spring Page JSON 응답을 매핑하는 타입이다.
+ * - 목록 API의 페이징 결과를 표현한다.
+ */
+export type PageResponse<T> = {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+  first: boolean;
+  last: boolean;
 };

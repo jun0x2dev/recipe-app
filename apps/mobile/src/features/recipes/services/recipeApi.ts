@@ -1,40 +1,168 @@
 import { authConfig } from '../../auth/services/authConfig';
 import { ApiResponse } from '../../auth/types/auth';
-import { CreateRecipeRequest, Recipe } from '../types/recipe';
+import { CreateRecipeRequest, PageResponse, Recipe, UpdateRecipeRequest } from '../types/recipe';
 
 /**
  * - 백엔드 레시피 생성 API를 호출한다.
- * - accessToken은 Authorization Bearer 헤더로 전달한다.
- * - 성공하면 백엔드가 저장한 레시피 응답을 모바일 표시 타입으로 변환한다.
  */
 export async function createRecipe(
   accessToken: string,
   request: CreateRecipeRequest,
-): Promise<Recipe> {
-  const response = await fetch(`${authConfig.apiBaseUrl}/api/v1/recipes`, {
+): Promise<Recipe | null> {
+  const body = await apiFetch<RecipeApiResponse>(accessToken, '/api/v1/recipes', {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify(request),
   });
 
-  const body = (await response.json()) as ApiResponse<RecipeApiResponse>;
-
-  if (!response.ok || !body.success || !body.data) {
-    throw new Error(body.error?.message ?? '레시피 저장 중 오류가 발생했습니다.');
-  }
-
-  return toRecipe(body.data);
+  return body ? toRecipe(body) : null;
 }
 
 /**
- * - 백엔드 레시피 응답 타입이다.
- * - Kotlin enum은 대문자 문자열로 내려오므로 모바일 도메인 타입으로 변환한다.
+ * - 내 레시피 목록을 페이징 조회한다.
  */
+export async function fetchMyRecipes(
+  accessToken: string,
+  params: { keyword?: string; page?: number; size?: number } = {},
+): Promise<PageResponse<Recipe>> {
+  const query = toQueryString(params);
+  const page = await apiFetch<PageResponse<RecipeListApiResponse>>(
+    accessToken,
+    `/api/v1/recipes${query}`,
+  );
+
+  return {
+    ...page!,
+    content: page!.content.map(toRecipeFromList),
+  };
+}
+
+/**
+ * - 공개 레시피 목록을 페이징 조회한다.
+ */
+export async function fetchPublicRecipes(
+  accessToken: string,
+  params: { keyword?: string; page?: number; size?: number } = {},
+): Promise<PageResponse<Recipe>> {
+  const query = toQueryString(params);
+  const page = await apiFetch<PageResponse<RecipeListApiResponse>>(
+    accessToken,
+    `/api/v1/recipes/public${query}`,
+  );
+
+  return {
+    ...page!,
+    content: page!.content.map(toRecipeFromList),
+  };
+}
+
+/**
+ * - 레시피 상세를 조회한다.
+ */
+export async function fetchRecipe(accessToken: string, recipeId: string): Promise<Recipe> {
+  const body = await apiFetch<RecipeApiResponse>(accessToken, `/api/v1/recipes/${recipeId}`);
+  return toRecipe(body!);
+}
+
+/**
+ * - 레시피를 수정한다.
+ */
+export async function updateRecipe(
+  accessToken: string,
+  recipeId: string,
+  request: UpdateRecipeRequest,
+): Promise<Recipe> {
+  const body = await apiFetch<RecipeApiResponse>(accessToken, `/api/v1/recipes/${recipeId}`, {
+    method: 'PUT',
+    body: JSON.stringify(request),
+  });
+
+  return toRecipe(body!);
+}
+
+/**
+ * - 레시피를 삭제한다.
+ */
+export async function deleteRecipe(accessToken: string, recipeId: string): Promise<void> {
+  const response = await fetch(`${authConfig.apiBaseUrl}/api/v1/recipes/${recipeId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    try {
+      const body = JSON.parse(text) as ApiResponse<never>;
+      throw new Error(body.error?.message ?? '레시피 삭제 중 오류가 발생했습니다.');
+    } catch (error) {
+      if (error instanceof Error && error.message !== '레시피 삭제 중 오류가 발생했습니다.') {
+        throw error;
+      }
+      throw new Error(toHttpErrorMessage(response));
+    }
+  }
+}
+
+// ── 내부 헬퍼 ──
+
+/**
+ * - 공통 API 호출 헬퍼다.
+ * - Bearer 토큰, JSON 파싱, ApiResponse 언래핑을 처리한다.
+ */
+async function apiFetch<T>(
+  accessToken: string,
+  path: string,
+  options: RequestInit = {},
+): Promise<T | null> {
+  const response = await fetch(`${authConfig.apiBaseUrl}${path}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+  const text = await response.text();
+
+  if (!text.trim()) {
+    if (response.ok) return null;
+    throw new Error(toHttpErrorMessage(response));
+  }
+
+  let body: ApiResponse<T>;
+  try {
+    body = JSON.parse(text) as ApiResponse<T>;
+  } catch {
+    throw new Error(response.ok ? '서버 응답을 읽을 수 없습니다.' : toHttpErrorMessage(response));
+  }
+
+  if (!response.ok || !body.success || !body.data) {
+    throw new Error(body.error?.message ?? toHttpErrorMessage(response));
+  }
+
+  return body.data;
+}
+
+function toHttpErrorMessage(response: Response): string {
+  if (response.status === 401 || response.status === 403) {
+    return '로그인이 만료되었습니다. 다시 로그인해주세요.';
+  }
+  return `요청 처리 중 오류가 발생했습니다. (${response.status})`;
+}
+
+function toQueryString(params: Record<string, string | number | undefined>): string {
+  const entries = Object.entries(params).filter(
+    ([, value]) => value !== undefined && value !== '',
+  );
+  if (entries.length === 0) return '';
+  return '?' + entries.map(([key, value]) => `${key}=${encodeURIComponent(String(value))}`).join('&');
+}
+
+// ── 응답 타입 & 변환 ──
+
 type RecipeApiResponse = {
   id: number;
+  userId: number;
   title: string;
   description: string | null;
   cookingTimeMinutes: number | null;
@@ -47,13 +175,23 @@ type RecipeApiResponse = {
   createdAt: string | null;
 };
 
-/**
- * - 백엔드 응답을 현재 모바일 화면에서 사용하는 Recipe 타입으로 변환한다.
- * - 재료는 name과 amount를 한 줄 문자열로 합쳐 기존 목록/상세 UI와 호환한다.
- */
+type RecipeListApiResponse = {
+  id: number;
+  userId: number;
+  title: string;
+  description: string | null;
+  cookingTimeMinutes: number | null;
+  visibility: 'PUBLIC' | 'PRIVATE';
+  viewCount: number;
+  likeCount: number;
+  shareCount: number;
+  createdAt: string | null;
+};
+
 function toRecipe(response: RecipeApiResponse): Recipe {
   return {
     id: String(response.id),
+    userId: String(response.userId),
     title: response.title,
     description: response.description ?? '',
     cookingTimeMinutes: response.cookingTimeMinutes ?? 0,
@@ -62,6 +200,23 @@ function toRecipe(response: RecipeApiResponse): Recipe {
       [ingredient.name, ingredient.amount].filter(Boolean).join(' '),
     ),
     steps: response.steps.sort((left, right) => left.order - right.order).map((step) => step.description),
+    viewCount: response.viewCount,
+    likeCount: response.likeCount,
+    shareCount: response.shareCount,
+    createdAt: response.createdAt?.slice(0, 10) ?? '',
+  };
+}
+
+function toRecipeFromList(response: RecipeListApiResponse): Recipe {
+  return {
+    id: String(response.id),
+    userId: String(response.userId),
+    title: response.title,
+    description: response.description ?? '',
+    cookingTimeMinutes: response.cookingTimeMinutes ?? 0,
+    visibility: response.visibility === 'PUBLIC' ? 'public' : 'private',
+    ingredients: [],
+    steps: [],
     viewCount: response.viewCount,
     likeCount: response.likeCount,
     shareCount: response.shareCount,

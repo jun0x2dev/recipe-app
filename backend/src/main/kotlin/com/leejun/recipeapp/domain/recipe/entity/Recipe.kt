@@ -107,4 +107,49 @@ class Recipe private constructor(
     fun addStep(description: String, sortOrder: Int) {
         steps.add(RecipeStep.create(this, description, sortOrder))
     }
+
+    /**
+     * - 레시피의 핵심 메타데이터를 수정한다.
+     * - 재료와 조리 단계는 replaceIngredients / replaceSteps로 별도 교체한다.
+     */
+    fun update(
+        title: String,
+        description: String?,
+        cookingTimeMinutes: Int?,
+        visibility: RecipeVisibility
+    ) {
+        this.title = title
+        this.description = description
+        this.cookingTimeMinutes = cookingTimeMinutes
+        this.visibility = visibility
+    }
+
+    /**
+     * - 기존 재료를 모두 제거하고 새 재료로 교체한다.
+     * - orphanRemoval=true가 제거된 엔티티의 DELETE를 처리한다.
+     */
+    fun replaceIngredients(newIngredients: List<Pair<String, String?>>) {
+        ingredients.clear()
+        newIngredients.forEachIndexed { index, (name, amount) ->
+            addIngredient(name, amount, index + 1)
+        }
+    }
+
+    /**
+     * - 기존 조리 단계를 모두 제거하고 새 단계로 교체한다.
+     */
+    fun replaceSteps(newSteps: List<String>) {
+        steps.clear()
+        newSteps.forEachIndexed { index, description ->
+            addStep(description, index + 1)
+        }
+    }
+
+    /**
+     * - 레시피를 논리 삭제한다.
+     * - deletedAt이 설정되면 목록/상세 조회에서 제외된다.
+     */
+    fun softDelete() {
+        this.deletedAt = LocalDateTime.now()
+    }
 }

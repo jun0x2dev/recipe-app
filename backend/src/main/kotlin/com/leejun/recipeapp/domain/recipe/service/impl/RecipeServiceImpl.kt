@@ -1,20 +1,22 @@
 package com.leejun.recipeapp.domain.recipe.service.impl
 
 import com.leejun.recipeapp.domain.auth.repository.UserRepository
-import com.leejun.recipeapp.domain.recipe.dto.CreateRecipeRequest
-import com.leejun.recipeapp.domain.recipe.dto.RecipeResponse
+import com.leejun.recipeapp.domain.recipe.dto.*
 import com.leejun.recipeapp.domain.recipe.entity.Recipe
+import com.leejun.recipeapp.domain.recipe.entity.RecipeVisibility
 import com.leejun.recipeapp.domain.recipe.repository.RecipeRepository
 import com.leejun.recipeapp.domain.recipe.service.RecipeService
 import com.leejun.recipeapp.global.exception.CustomException
 import com.leejun.recipeapp.global.exception.ErrorCode
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * - 레시피 작성 정책을 구현하는 서비스다.
- * - JWT에서 전달된 사용자 ID로 작성자를 조회하고 레시피/재료/단계를 한 번에 저장한다.
- * - 생성 API는 AI 추출 결과와 수동 작성 결과가 같은 저장 구조를 쓰도록 설계한다.
+ * - 레시피 도메인 서비스 구현체다.
+ * - 생성, 조회, 수정, 삭제 정책을 구현한다.
+ * - 소유자 검증이 필요한 작업은 공통 헬퍼로 처리한다.
  */
 @Service
 class RecipeServiceImpl(
@@ -22,11 +24,6 @@ class RecipeServiceImpl(
     private val userRepository: UserRepository
 ) : RecipeService {
 
-    /**
-     * - 인증된 사용자의 새 레시피를 저장한다.
-     * - 입력 문자열은 앞뒤 공백을 제거해 저장 품질을 일정하게 유지한다.
-     * - 작성자 ID가 더 이상 유효하지 않으면 표준 사용자 오류로 처리한다.
-     */
     @Transactional
     override fun createRecipe(userId: Long, request: CreateRecipeRequest): RecipeResponse {
         val user = userRepository.findById(userId)
@@ -60,5 +57,73 @@ class RecipeServiceImpl(
             }
 
         return RecipeResponse.from(recipeRepository.save(recipe))
+    }
+
+    @Transactional(readOnly = true)
+    override fun getRecipe(userId: Long, recipeId: Long): RecipeResponse {
+        val recipe = findActiveRecipeOrThrow(recipeId)
+
+        if (recipe.user.id != userId && recipe.visibility != RecipeVisibility.PUBLIC) {
+            throw CustomException(ErrorCode.RECIPE_ACCESS_DENIED)
+        }
+
+        return RecipeResponse.from(recipe)
+    }
+
+    @Transactional(readOnly = true)
+    override fun getMyRecipes(userId: Long, keyword: String?, pageable: Pageable): Page<RecipeListResponse> {
+        val likeKeyword = keyword?.takeIf { it.isNotBlank() }?.let { "%${it.lowercase()}%" }
+        return recipeRepository.findMyRecipes(userId, likeKeyword, pageable)
+            .map { RecipeListResponse.from(it) }
+    }
+
+    @Transactional(readOnly = true)
+    override fun getPublicRecipes(keyword: String?, pageable: Pageable): Page<RecipeListResponse> {
+        val likeKeyword = keyword?.takeIf { it.isNotBlank() }?.let { "%${it.lowercase()}%" }
+        return recipeRepository.findByVisibility(RecipeVisibility.PUBLIC, likeKeyword, pageable)
+            .map { RecipeListResponse.from(it) }
+    }
+
+    @Transactional
+    override fun updateRecipe(userId: Long, recipeId: Long, request: UpdateRecipeRequest): RecipeResponse {
+        val recipe = findOwnedRecipeOrThrow(recipeId, userId)
+
+        recipe.update(
+            title = request.title.trim(),
+            description = request.description?.trim()?.ifBlank { null },
+            cookingTimeMinutes = request.cookingTimeMinutes,
+            visibility = request.visibility
+        )
+
+        recipe.replaceIngredients(
+            request.ingredients.map { it.name.trim() to it.amount?.trim()?.ifBlank { null } }
+        )
+
+        recipe.replaceSteps(
+            request.steps.map { it.description.trim() }
+        )
+
+        return RecipeResponse.from(recipeRepository.save(recipe))
+    }
+
+    @Transactional
+    override fun deleteRecipe(userId: Long, recipeId: Long) {
+        val recipe = findOwnedRecipeOrThrow(recipeId, userId)
+        recipe.softDelete()
+    }
+
+    private fun findActiveRecipeOrThrow(recipeId: Long): Recipe {
+        return recipeRepository.findByIdAndDeletedAtIsNull(recipeId)
+            ?: throw CustomException(ErrorCode.RECIPE_NOT_FOUND)
+    }
+
+    private fun findOwnedRecipeOrThrow(recipeId: Long, userId: Long): Recipe {
+        val recipe = findActiveRecipeOrThrow(recipeId)
+
+        if (recipe.user.id != userId) {
+            throw CustomException(ErrorCode.RECIPE_ACCESS_DENIED)
+        }
+
+        return recipe
     }
 }
