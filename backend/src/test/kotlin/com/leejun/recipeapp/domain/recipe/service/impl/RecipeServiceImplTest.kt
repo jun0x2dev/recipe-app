@@ -50,6 +50,7 @@ class RecipeServiceImplTest {
         val request = CreateRecipeRequest(
             title = " 토마토 계란 볶음 ",
             description = " 간단한 아침 메뉴 ",
+            servings = 2,
             cookingTimeMinutes = 10,
             visibility = RecipeVisibility.PRIVATE,
             ingredients = listOf(
@@ -69,6 +70,7 @@ class RecipeServiceImplTest {
 
         assertThat(response.title).isEqualTo("토마토 계란 볶음")
         assertThat(response.description).isEqualTo("간단한 아침 메뉴")
+        assertThat(response.servings).isEqualTo(2)
         assertThat(response.cookingTimeMinutes).isEqualTo(10)
         assertThat(response.visibility).isEqualTo(RecipeVisibility.PRIVATE)
         assertThat(response.ingredients).hasSize(2)
@@ -92,6 +94,7 @@ class RecipeServiceImplTest {
                 CreateRecipeRequest(
                     title = "레시피",
                     description = null,
+                    servings = null,
                     cookingTimeMinutes = null,
                     visibility = RecipeVisibility.PRIVATE
                 )

@@ -10,6 +10,7 @@ import jakarta.validation.constraints.Size
 /**
  * - 수동 레시피 작성 API 요청 DTO다.
  * - 모바일 작성 화면의 입력값을 저장 가능한 구조화 데이터로 전달한다.
+ * - servings는 레시피당 하나의 값이므로 recipes 테이블 컬럼으로 저장한다.
  * - ingredients와 steps는 줄바꿈 텍스트를 모바일에서 배열로 변환해 보낸다.
  */
 data class CreateRecipeRequest(
@@ -19,6 +20,10 @@ data class CreateRecipeRequest(
 
     @field:Size(max = 1000, message = "레시피 설명은 1000자 이하로 입력해주세요.")
     val description: String?,
+
+    @field:Min(value = 1, message = "몇 인분은 1인분 이상이어야 합니다.")
+    @field:Max(value = 100, message = "몇 인분은 100인분 이하로 입력해주세요.")
+    val servings: Int?,
 
     @field:Min(value = 1, message = "조리 시간은 1분 이상이어야 합니다.")
     @field:Max(value = 1440, message = "조리 시간은 1440분 이하로 입력해주세요.")

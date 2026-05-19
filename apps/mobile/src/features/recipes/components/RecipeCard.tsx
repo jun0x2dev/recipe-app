@@ -46,6 +46,12 @@ export function RecipeCard({ recipe, theme, onPress }: RecipeCardProps) {
           {recipe.description}
         </Text>
         <View style={styles.metaRow}>
+          {recipe.servings ? (
+            <>
+              <Text style={[styles.meta, { color: theme.textMuted }]}>{recipe.servings}인분</Text>
+              <Text style={[styles.metaDot, { color: theme.textMuted }]}>·</Text>
+            </>
+          ) : null}
           <Text style={[styles.meta, { color: theme.textMuted }]}>{recipe.cookingTimeMinutes}분</Text>
           <Text style={[styles.metaDot, { color: theme.textMuted }]}>·</Text>
           <Text style={[styles.meta, { color: theme.textMuted }]}>조회 {recipe.viewCount}</Text>

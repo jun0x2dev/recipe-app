@@ -17,6 +17,14 @@ class SimpleExtractRequest(BaseModel):
     url: str = Field(..., description="YouTube Shorts URL")
 
 
+class GenerateRecipeRequest(BaseModel):
+    """서비스용 음식명 기반 레시피 생성 요청."""
+
+    query: str = Field(..., min_length=1, description="Dish name or recipe request")
+    ollama_model: str = Field("gemma3:12b", description="Ollama model name")
+    ollama_url: str = Field("http://localhost:11434/api/generate", description="Ollama generate API URL")
+
+
 class DebugExtractRequest(BaseModel):
     """개발자용 유튜브 쇼츠 레시피 추출 요청."""
 
@@ -33,7 +41,7 @@ class DebugExtractRequest(BaseModel):
     stt_device: str = Field("cpu", description="STT device")
     stt_compute_type: str = Field("int8", description="STT compute type")
     recipe_provider: Literal["heuristic", "ollama"] = Field("heuristic", description="Recipe extraction provider")
-    ollama_model: str = Field("llama3.1", description="Ollama model name")
+    ollama_model: str = Field("gemma3:12b", description="Ollama model name")
     ollama_url: str = Field("http://localhost:11434/api/generate", description="Ollama generate API URL")
     enforce_recipe_content: bool = Field(False, description="Reject non-recipe-looking videos before heavy processing")
 

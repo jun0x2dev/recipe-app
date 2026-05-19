@@ -55,6 +55,7 @@ apps/mobile/                         - 모바일 앱 루트
     features/                        - 기능 단위 코드
       auth/                          - 인증 기능 모듈
         AuthContext.tsx              - 로그인 토큰 상태 Context
+        components/SocialLoginButton.tsx - 소셜 로그인 브랜드 버튼
         screens/LoginScreen.tsx      - 소셜 로그인 화면
         services/authApi.ts          - 백엔드 인증 API 호출
         services/authConfig.ts       - 인증 런타임 설정
@@ -69,7 +70,7 @@ apps/mobile/                         - 모바일 앱 루트
         data/                        - 백엔드 연동 전 mock 데이터
           mockRecipes.ts             - 레시피 mock 데이터
         services/                    - 레시피 백엔드 API 호출
-          aiRecipeApi.ts             - AI Worker 레시피 초안 생성 API 클라이언트
+          aiRecipeApi.ts             - AI Worker 유튜브 추출/음식명 생성 API 클라이언트
           recipeApi.ts               - 레시피 생성 API 클라이언트
         screens/                     - 레시피 화면 컴포넌트
           RecipeCreateScreen.tsx     - 레시피 작성 화면
@@ -95,7 +96,7 @@ apps/mobile/                         - 모바일 앱 루트
 - 공개 레시피 둘러보기
 - 설정
 - 레시피 상세
-- 레시피 작성, 재료/단계 행 추가 입력, AI 초안 채우기, 생성 API 호출
+- 레시피 작성, 몇 인분/재료/단계 행 추가 입력, 음식명/유튜브 링크 기반 AI 초안 채우기, 생성 API 호출
 - 라이트/다크/시스템 화면 모드 선택
 - mock 데이터 기반 화면 흐름
 

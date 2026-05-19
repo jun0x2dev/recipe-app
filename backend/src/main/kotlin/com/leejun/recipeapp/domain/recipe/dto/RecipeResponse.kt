@@ -14,6 +14,7 @@ data class RecipeResponse(
     val userId: Long,
     val title: String,
     val description: String?,
+    val servings: Int?,
     val cookingTimeMinutes: Int?,
     val visibility: RecipeVisibility,
     val ingredients: List<RecipeIngredientResponse>,
@@ -34,6 +35,7 @@ data class RecipeResponse(
                 userId = recipe.user.id,
                 title = recipe.title,
                 description = recipe.description,
+                servings = recipe.servings,
                 cookingTimeMinutes = recipe.cookingTimeMinutes,
                 visibility = recipe.visibility,
                 ingredients = recipe.ingredients

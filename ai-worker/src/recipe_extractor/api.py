@@ -14,11 +14,17 @@ from recipe_extractor.errors import (
     AppError,
 )
 from recipe_extractor.pipeline import ExtractionOptions, run_extraction
+from recipe_extractor.recipe_generate import generate_recipe_draft_with_ollama
 
 try:
     from fastapi import FastAPI, HTTPException
     from fastapi.middleware.cors import CORSMiddleware
-    from recipe_extractor.api_models import DebugExtractRequest, HealthResponse, SimpleExtractRequest
+    from recipe_extractor.api_models import (
+        DebugExtractRequest,
+        GenerateRecipeRequest,
+        HealthResponse,
+        SimpleExtractRequest,
+    )
 except ModuleNotFoundError as error:  # pragma: no cover - dependency 안내용 분기
     raise RuntimeError(
         "FastAPI 의존성이 설치되어 있지 않습니다. "
@@ -70,11 +76,38 @@ def extract(request: SimpleExtractRequest) -> dict[str, Any]:
         stt_device="cpu",
         stt_compute_type="int8",
         recipe_provider="ollama",
-        ollama_model="qwen2.5:7b",
+        ollama_model="gemma3:12b",
         enforce_recipe_content=True,
     )
 
     return run_extraction_or_raise(request.url, options, include_debug=False)
+
+
+@app.post("/generate", tags=["service"])
+def generate_recipe(request: GenerateRecipeRequest) -> dict[str, Any]:
+    """음식명 또는 짧은 요청 문장으로 레시피 초안을 생성한다.
+
+    - 유튜브 링크 없이 사용자가 입력한 음식명만으로 동작한다.
+    - 결과는 근거 기반 추출이 아니라 AI 생성 초안이므로 저장 전 사용자 검토가 필요하다.
+    """
+
+    try:
+        recipe = generate_recipe_draft_with_ollama(
+            query=request.query,
+            model=request.ollama_model,
+            url=request.ollama_url,
+        )
+    except AppError as error:
+        detail = {
+            "code": error.code.value,
+            "message": error.message,
+        }
+        raise HTTPException(status_code=error.status_code, detail=detail) from error
+
+    return {
+        "query": request.query,
+        "recipe": recipe.to_public_dict(),
+    }
 
 
 @app.post("/debug/extract", tags=["debug"])

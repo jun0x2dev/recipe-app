@@ -2,6 +2,29 @@ import { authConfig } from '../../auth/services/authConfig';
 import { RecipeDraft } from '../types/recipe';
 
 /**
+ * - AI Worker에 음식명 또는 짧은 요청 문장을 보내 레시피 초안을 생성한다.
+ * - 유튜브 근거 없이 LLM이 만든 draft이므로 저장 전 사용자 검토가 필요하다.
+ */
+export async function generateRecipeDraftFromQuery(query: string): Promise<RecipeDraft> {
+  const response = await fetch(`${authConfig.aiWorkerBaseUrl}/generate`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ query }),
+  });
+
+  const body = (await response.json()) as AiWorkerGenerateResponse | AiWorkerErrorResponse;
+
+  if (!response.ok || !('recipe' in body)) {
+    throw new Error(getAiWorkerErrorMessage(body));
+  }
+
+  return toRecipeDraft(body.recipe);
+}
+
+/**
  * - AI Worker에 유튜브 쇼츠 링크를 보내 레시피 초안을 생성한다.
  * - 현재는 개발 편의를 위해 모바일에서 AI Worker를 직접 호출한다.
  * - 운영 전에는 Spring Boot 백엔드가 AI Worker를 호출하는 구조로 바꾼다.
@@ -24,6 +47,14 @@ export async function extractRecipeDraftFromYoutube(url: string): Promise<Recipe
 
   return toRecipeDraft(body.recipe);
 }
+
+/**
+ * - AI Worker `/generate` 성공 응답 중 작성 화면에 필요한 필드만 정의한다.
+ */
+type AiWorkerGenerateResponse = {
+  query: string;
+  recipe: AiRecipeDraft;
+};
 
 /**
  * - AI Worker `/extract` 성공 응답 중 작성 화면에 필요한 필드만 정의한다.
@@ -73,7 +104,9 @@ type AiStepDraft = {
 /**
  * - AI Worker 오류 응답에서 사용자에게 표시할 메시지를 고른다.
  */
-function getAiWorkerErrorMessage(body: AiWorkerExtractResponse | AiWorkerErrorResponse): string {
+function getAiWorkerErrorMessage(
+  body: AiWorkerGenerateResponse | AiWorkerExtractResponse | AiWorkerErrorResponse,
+): string {
   if ('detail' in body && body.detail?.message) {
     return body.detail.message;
   }
@@ -89,6 +122,7 @@ function toRecipeDraft(recipe: AiRecipeDraft): RecipeDraft {
   return {
     title: recipe.title?.trim() ?? '',
     description: recipe.description?.trim() ?? '',
+    servings: recipe.servings ? String(recipe.servings) : '',
     cookingTimeMinutes: recipe.estimated_cooking_time_minutes
       ? String(recipe.estimated_cooking_time_minutes)
       : '',

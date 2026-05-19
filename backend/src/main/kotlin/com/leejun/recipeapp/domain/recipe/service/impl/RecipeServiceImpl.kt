@@ -33,6 +33,7 @@ class RecipeServiceImpl(
             user = user,
             title = request.title.trim(),
             description = request.description?.trim()?.ifBlank { null },
+            servings = request.servings,
             cookingTimeMinutes = request.cookingTimeMinutes,
             visibility = request.visibility
         )
@@ -91,6 +92,7 @@ class RecipeServiceImpl(
         recipe.update(
             title = request.title.trim(),
             description = request.description?.trim()?.ifBlank { null },
+            servings = request.servings,
             cookingTimeMinutes = request.cookingTimeMinutes,
             visibility = request.visibility
         )

@@ -29,6 +29,279 @@ http://127.0.0.1:8001/docs
 curl http://127.0.0.1:8001/health
 ```
 
+## Windows 설치 및 실행
+
+### 1. Python 가상환경 준비
+
+Windows PowerShell에서는 다음 순서로 설치합니다.
+
+```powershell
+cd E:\LEEJUN\LEEJUN\prj-workspace\recipe-app\ai-worker
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -e ".[api,stt]"
+```
+
+실행 정책 때문에 가상환경 활성화가 막히면 현재 터미널에서만 다음 명령을 먼저 실행합니다.
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+```
+
+이미 가상환경을 만든 뒤 다시 들어왔을 때:
+
+```powershell
+cd E:\LEEJUN\LEEJUN\prj-workspace\recipe-app\ai-worker
+.\.venv\Scripts\Activate.ps1
+```
+
+### 2. Ollama 설치
+
+winget을 사용할 수 있으면 다음 명령으로 설치합니다.
+
+```powershell
+winget install Ollama.Ollama
+```
+
+설치 후 새 PowerShell을 열고 확인합니다.
+
+```powershell
+ollama --version
+```
+
+`ollama` 명령을 찾지 못하면 설치 경로의 실행 파일을 직접 호출합니다.
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" --version
+```
+
+winget 설치가 어렵다면 공식 다운로드 페이지에서 Windows 설치 파일을 받아 설치합니다.
+
+```text
+https://ollama.com/download
+```
+
+### 3. AI 모델 설치
+
+현재 기본 모델은 `gemma3:12b`입니다.
+
+```powershell
+ollama pull gemma3:12b
+```
+
+`ollama` 명령이 PATH에 잡히지 않았으면 다음처럼 실행합니다.
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" pull gemma3:12b
+```
+
+설치된 모델 목록 확인:
+
+```powershell
+ollama list
+```
+
+### 4. AI 모델 실행 테스트
+
+```powershell
+ollama run gemma3:12b "김치볶음밥 재료를 한국어로 간단히 알려줘"
+```
+
+PATH 문제가 있으면:
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" run gemma3:12b "김치볶음밥 재료를 한국어로 간단히 알려줘"
+```
+
+### 5. AI Worker 서버 실행
+
+Ollama가 백그라운드에서 실행 중인 상태에서 AI Worker를 켭니다.
+
+```powershell
+cd E:\LEEJUN\LEEJUN\prj-workspace\recipe-app\ai-worker
+.\.venv\Scripts\Activate.ps1
+python -m recipe_extractor.api
+```
+
+서버 주소:
+
+```text
+http://127.0.0.1:8001
+```
+
+Swagger UI:
+
+```text
+http://127.0.0.1:8001/docs
+```
+
+PowerShell에서 음식명 기반 생성 API 테스트:
+
+```powershell
+curl -X POST http://127.0.0.1:8001/generate `
+  -H "Content-Type: application/json" `
+  -d "{\"query\":\"김치볶음밥\"}"
+```
+
+PowerShell에서 유튜브 쇼츠 추출 API 테스트:
+
+```powershell
+curl -X POST http://127.0.0.1:8001/extract `
+  -H "Content-Type: application/json" `
+  -d "{\"url\":\"https://youtube.com/shorts/ldsIYEb1t5o?si=A42NBH2ug9pPv\"}"
+```
+
+### 6. AI 모델 삭제
+
+설치된 모델을 확인합니다.
+
+```powershell
+ollama list
+```
+
+사용하지 않는 모델을 삭제합니다.
+
+```powershell
+ollama rm qwen2.5:7b
+ollama rm qwen3:8b
+ollama rm gemma3:12b
+```
+
+PATH 문제가 있으면:
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" rm qwen2.5:7b
+& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" rm qwen3:8b
+& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" rm gemma3:12b
+```
+
+## macOS 설치 및 실행
+
+### 1. Python 가상환경 준비
+
+```bash
+cd /path/to/recipe-app/ai-worker
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -e ".[api,stt]"
+```
+
+이미 가상환경을 만든 뒤 다시 들어왔을 때:
+
+```bash
+cd /path/to/recipe-app/ai-worker
+source .venv/bin/activate
+```
+
+### 2. Ollama 설치
+
+공식 macOS 설치 방식은 Ollama 앱을 설치한 뒤 Terminal에서 `ollama` CLI를 사용하는 방식입니다.
+
+```text
+https://ollama.com/download
+```
+
+Homebrew를 사용한다면 다음 명령도 사용할 수 있습니다.
+
+```bash
+brew install ollama
+```
+
+설치 확인:
+
+```bash
+ollama --version
+```
+
+공식 macOS 설치 문서는 다음 링크에서 확인할 수 있습니다.
+
+```text
+https://docs.ollama.com/macos
+```
+
+### 3. AI 모델 설치
+
+현재 기본 모델은 `gemma3:12b`입니다.
+
+```bash
+ollama pull gemma3:12b
+```
+
+설치된 모델 목록 확인:
+
+```bash
+ollama list
+```
+
+### 4. AI 모델 실행 테스트
+
+```bash
+ollama run gemma3:12b "김치볶음밥 재료를 한국어로 간단히 알려줘"
+```
+
+### 5. AI Worker 서버 실행
+
+Ollama가 실행 중인 상태에서 AI Worker를 켭니다.
+
+```bash
+cd /path/to/recipe-app/ai-worker
+source .venv/bin/activate
+python -m recipe_extractor.api
+```
+
+서버 주소:
+
+```text
+http://127.0.0.1:8001
+```
+
+Swagger UI:
+
+```text
+http://127.0.0.1:8001/docs
+```
+
+음식명 기반 생성 API 테스트:
+
+```bash
+curl -X POST http://127.0.0.1:8001/generate \
+  -H "Content-Type: application/json" \
+  -d '{"query":"김치볶음밥"}'
+```
+
+유튜브 쇼츠 추출 API 테스트:
+
+```bash
+curl -X POST http://127.0.0.1:8001/extract \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://youtube.com/shorts/ldsIYEb1t5o?si=A42NBH2ug9pPv"}'
+```
+
+### 6. AI 모델 삭제
+
+설치된 모델을 확인합니다.
+
+```bash
+ollama list
+```
+
+사용하지 않는 모델을 삭제합니다.
+
+```bash
+ollama rm qwen2.5:7b
+ollama rm qwen3:8b
+ollama rm gemma3:12b
+```
+
+## Ollama 참고 링크
+
+- 공식 다운로드: `https://ollama.com/download`
+- macOS 공식 문서: `https://docs.ollama.com/macos`
+- 모델 라이브러리: `https://ollama.com/library`
+
 ## 설치
 
 Python 3.9 이상을 사용합니다.
@@ -111,6 +384,16 @@ curl -X POST http://127.0.0.1:8001/extract \
   -d '{"url":"https://youtube.com/shorts/ldsIYEb1t5o?si=A42NBH2ug9pPv"}'
 ```
 
+음식명 기반 레시피 생성 API 테스트:
+
+기본 Ollama 모델은 `gemma3:12b`입니다.
+
+```bash
+curl -X POST http://127.0.0.1:8001/generate \
+  -H "Content-Type: application/json" \
+  -d '{"query":"김치볶음밥"}'
+```
+
 개발자용 추출 API 테스트:
 
 ```bash
@@ -150,7 +433,7 @@ python -m recipe_extractor "https://youtube.com/shorts/ldsIYEb1t5o?si=A42NBH2ug9
 로컬 Ollama를 사용할 때:
 
 ```bash
-python -m recipe_extractor "https://youtube.com/shorts/ldsIYEb1t5o?si=A42NBH2ug9pPv" --extract-recipe --recipe-provider ollama --ollama-model llama3.1 --stt-model small --pretty
+python -m recipe_extractor "https://youtube.com/shorts/ldsIYEb1t5o?si=A42NBH2ug9pPv" --extract-recipe --recipe-provider ollama --ollama-model gemma3:12b --stt-model small --pretty
 ```
 
 YouTube가 오디오 다운로드를 `403 Forbidden`으로 막으면 브라우저 쿠키를 함께 전달합니다.
@@ -180,25 +463,7 @@ EXPO_PUBLIC_AI_WORKER_BASE_URL=http://localhost:8001
 
 iOS 시뮬레이터는 일반적으로 `localhost`로 접근할 수 있습니다. Android 에뮬레이터에서는 필요하면 `http://10.0.2.2:8001` 사용을 검토합니다.
 
-## Windows PowerShell
-
-PowerShell에서는 다음 순서로 설치합니다.
-
-```powershell
-cd ai-worker
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip setuptools wheel
-python -m pip install -e ".[api,stt]"
-python -m recipe_extractor.api
-```
-
-실행 정책 때문에 가상환경 활성화가 막히면 현재 터미널에서만 다음 명령을 먼저 실행합니다.
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\.venv\Scripts\Activate.ps1
-```
+## Windows PowerShell curl 참고
 
 PowerShell에서 `curl` 줄바꿈을 사용할 때:
 
@@ -206,6 +471,12 @@ PowerShell에서 `curl` 줄바꿈을 사용할 때:
 curl -X POST http://127.0.0.1:8001/extract `
   -H "Content-Type: application/json" `
   -d "{\"url\":\"https://youtube.com/shorts/ldsIYEb1t5o?si=A42NBH2ug9pPv\"}"
+```
+
+```powershell
+curl -X POST http://127.0.0.1:8001/generate `
+  -H "Content-Type: application/json" `
+  -d "{\"query\":\"김치볶음밥\"}"
 ```
 
 ## 자주 나는 오류
