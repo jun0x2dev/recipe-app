@@ -76,7 +76,7 @@ def extract(request: SimpleExtractRequest) -> dict[str, Any]:
         stt_device="cpu",
         stt_compute_type="int8",
         recipe_provider="ollama",
-        ollama_model="gemma3:12b",
+        ollama_model="gemma3:4b",
         enforce_recipe_content=True,
     )
 

@@ -8,7 +8,6 @@ import { Platform } from 'react-native';
  */
 type AppExtra = {
   apiBaseUrl?: string;
-  aiWorkerBaseUrl?: string;
   naverClientId?: string;
   naverClientSecret?: string;
   naverUrlScheme?: string;
@@ -35,29 +34,13 @@ function resolveApiBaseUrl() {
 }
 
 /**
- * - 로컬 AI Worker 주소를 플랫폼별로 보정한다.
- * - 초기 MVP에서는 모바일에서 AI Worker를 직접 호출하지만, 운영 전 백엔드 프록시로 전환한다.
- */
-function resolveAiWorkerBaseUrl() {
-  const configuredUrl = process.env.EXPO_PUBLIC_AI_WORKER_BASE_URL ?? extra.aiWorkerBaseUrl;
-
-  if (configuredUrl) {
-    return Platform.OS === 'android'
-      ? configuredUrl.replace('localhost', '10.0.2.2')
-      : configuredUrl;
-  }
-
-  return Platform.OS === 'android' ? 'http://10.0.2.2:8001' : 'http://localhost:8001';
-}
-
-/**
  * - 인증 기능에서 사용하는 런타임 설정이다.
  * - 민감한 값은 저장소에 남기지 않고 환경 변수로 덮어쓴다.
  * - 앱 출시 전 dev/prod 환경별 API 주소 분리가 필요하다.
+ * - AI Worker 호출은 백엔드 프록시를 거치므로 별도 URL이 필요 없다.
  */
 export const authConfig = {
   apiBaseUrl: resolveApiBaseUrl(),
-  aiWorkerBaseUrl: resolveAiWorkerBaseUrl(),
   naverClientId: process.env.EXPO_PUBLIC_NAVER_CLIENT_ID ?? extra.naverClientId ?? '',
   naverClientSecret: process.env.EXPO_PUBLIC_NAVER_CLIENT_SECRET ?? extra.naverClientSecret ?? '',
   naverUrlScheme: process.env.EXPO_PUBLIC_NAVER_URL_SCHEME ?? extra.naverUrlScheme ?? 'com.leejun.recipeapp',

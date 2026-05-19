@@ -118,7 +118,6 @@ SDK가 설치되지 않은 브라우저 확인 환경에서는 plugin 등록을 
 ```bash
 EXPO_PUBLIC_NAVER_CLIENT_SECRET=네이버_클라이언트_시크릿
 EXPO_PUBLIC_API_BASE_URL=http://localhost:8089
-EXPO_PUBLIC_AI_WORKER_BASE_URL=http://localhost:8001
 ```
 
 실기기에서 로컬 백엔드에 접근할 때는 `EXPO_PUBLIC_API_BASE_URL`을 PC의 LAN IP로 지정합니다.

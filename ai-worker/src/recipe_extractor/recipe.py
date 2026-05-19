@@ -18,7 +18,7 @@ def extract_recipe_draft(
     metadata: YouTubeMetadata,
     transcript: Optional[Transcript],
     provider: str = "heuristic",
-    ollama_model: str = "gemma3:12b",
+    ollama_model: str = "gemma3:4b",
     ollama_url: str = "http://localhost:11434/api/generate",
 ) -> RecipeDraft:
     """메타데이터와 STT 결과로 레시피 초안을 만든다."""

@@ -24,5 +24,9 @@ enum class ErrorCode(
     RECIPE_NOT_FOUND(HttpStatus.NOT_FOUND, "레시피를 찾을 수 없습니다."),
     RECIPE_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 레시피에 대한 권한이 없습니다."),
 
+    AI_WORKER_UNAVAILABLE(HttpStatus.BAD_GATEWAY, "AI 서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요."),
+    AI_WORKER_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "AI 처리 시간이 초과되었습니다. 잠시 후 다시 시도해주세요."),
+    AI_WORKER_ERROR(HttpStatus.BAD_GATEWAY, "AI 레시피 생성 중 오류가 발생했습니다."),
+
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다.")
 }

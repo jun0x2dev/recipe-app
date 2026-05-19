@@ -227,12 +227,18 @@ export function RecipeCreateScreen({ recipeId }: RecipeCreateScreenProps) {
       return;
     }
 
+    if (!tokenResponse?.accessToken) {
+      Alert.alert('로그인이 필요합니다', 'AI 초안 생성을 위해 먼저 로그인해주세요.');
+      return;
+    }
+
     try {
       setIsExtracting(true);
+
       const aiDraft =
         aiDraftMode === 'query'
-          ? await generateRecipeDraftFromQuery(trimmedInput)
-          : await extractRecipeDraftFromYoutube(trimmedInput);
+          ? await generateRecipeDraftFromQuery(tokenResponse.accessToken, trimmedInput)
+          : await extractRecipeDraftFromYoutube(tokenResponse.accessToken, trimmedInput);
       setDraft((currentDraft) => ({
         ...currentDraft,
         ...aiDraft,

@@ -27,3 +27,8 @@ oauth:
     token-info-uri: https://oauth2.googleapis.com/tokeninfo
     allowed-audiences:
       - change-me-google-web-client-id.apps.googleusercontent.com
+
+ai-worker:
+  base-url: http://localhost:8001
+  connect-timeout: 5000
+  read-timeout: 120000
