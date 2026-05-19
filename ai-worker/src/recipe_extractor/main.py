@@ -98,8 +98,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--ollama-model",
-        default="gemma3:12b",
-        help="Ollama model name for recipe extraction. Defaults to gemma3:12b.",
+        default="gemma3:4b",
+        help="Ollama model name for recipe extraction. Defaults to gemma3:4b.",
     )
     parser.add_argument(
         "--ollama-url",

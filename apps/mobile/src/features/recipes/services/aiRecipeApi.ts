@@ -1,55 +1,99 @@
 import { authConfig } from '../../auth/services/authConfig';
+import { ApiResponse } from '../../auth/types/auth';
 import { RecipeDraft } from '../types/recipe';
 
 /**
- * - AI Worker에 음식명 또는 짧은 요청 문장을 보내 레시피 초안을 생성한다.
- * - 유튜브 근거 없이 LLM이 만든 draft이므로 저장 전 사용자 검토가 필요하다.
+ * - 백엔드 AI 레시피 프록시 API를 통해 음식명 기반 레시피 초안을 생성한다.
+ * - 백엔드가 JWT 인증을 거친 뒤 AI Worker로 요청을 전달한다.
+ * - LLM이 만든 draft이므로 저장 전 사용자 검토가 필요하다.
  */
-export async function generateRecipeDraftFromQuery(query: string): Promise<RecipeDraft> {
-  const response = await fetch(`${authConfig.aiWorkerBaseUrl}/generate`, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
+export async function generateRecipeDraftFromQuery(
+  accessToken: string,
+  query: string,
+): Promise<RecipeDraft> {
+  const body = await apiFetch<AiWorkerGenerateResponse>(
+    accessToken,
+    '/api/v1/ai/recipes/generate',
+    {
+      method: 'POST',
+      body: JSON.stringify({ query }),
     },
-    body: JSON.stringify({ query }),
-  });
-
-  const body = (await response.json()) as AiWorkerGenerateResponse | AiWorkerErrorResponse;
-
-  if (!response.ok || !('recipe' in body)) {
-    throw new Error(getAiWorkerErrorMessage(body));
-  }
+  );
 
   return toRecipeDraft(body.recipe);
 }
 
 /**
- * - AI Worker에 유튜브 쇼츠 링크를 보내 레시피 초안을 생성한다.
- * - 현재는 개발 편의를 위해 모바일에서 AI Worker를 직접 호출한다.
- * - 운영 전에는 Spring Boot 백엔드가 AI Worker를 호출하는 구조로 바꾼다.
+ * - 백엔드 AI 레시피 프록시 API를 통해 유튜브 쇼츠 기반 레시피 초안을 생성한다.
+ * - 백엔드가 JWT 인증을 거친 뒤 AI Worker로 요청을 전달한다.
+ * - STT + LLM 파이프라인으로 응답 시간이 길 수 있다.
  */
-export async function extractRecipeDraftFromYoutube(url: string): Promise<RecipeDraft> {
-  const response = await fetch(`${authConfig.aiWorkerBaseUrl}/extract`, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
+export async function extractRecipeDraftFromYoutube(
+  accessToken: string,
+  url: string,
+): Promise<RecipeDraft> {
+  const body = await apiFetch<AiWorkerExtractResponse>(
+    accessToken,
+    '/api/v1/ai/recipes/extract',
+    {
+      method: 'POST',
+      body: JSON.stringify({ url }),
     },
-    body: JSON.stringify({ url }),
-  });
-
-  const body = (await response.json()) as AiWorkerExtractResponse | AiWorkerErrorResponse;
-
-  if (!response.ok || !('recipe' in body)) {
-    throw new Error(getAiWorkerErrorMessage(body));
-  }
+  );
 
   return toRecipeDraft(body.recipe);
 }
 
+// ── 내부 헬퍼 ──
+
 /**
- * - AI Worker `/generate` 성공 응답 중 작성 화면에 필요한 필드만 정의한다.
+ * - 백엔드 AI API 공통 호출 헬퍼다.
+ * - Bearer 토큰, JSON 파싱, ApiResponse 언래핑을 처리한다.
+ */
+async function apiFetch<T>(
+  accessToken: string,
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const response = await fetch(`${authConfig.apiBaseUrl}${path}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+  const text = await response.text();
+
+  let body: ApiResponse<T>;
+  try {
+    body = JSON.parse(text) as ApiResponse<T>;
+  } catch {
+    throw new Error(
+      response.ok ? '서버 응답을 읽을 수 없습니다.' : toHttpErrorMessage(response),
+    );
+  }
+
+  if (!response.ok || !body.success || !body.data) {
+    throw new Error(body.error?.message ?? toHttpErrorMessage(response));
+  }
+
+  return body.data;
+}
+
+/**
+ * - HTTP 상태 코드 기반 기본 에러 메시지를 생성한다.
+ */
+function toHttpErrorMessage(response: Response): string {
+  if (response.status === 401 || response.status === 403) {
+    return '로그인이 만료되었습니다. 다시 로그인해주세요.';
+  }
+  return `AI 레시피 생성 중 오류가 발생했습니다. (${response.status})`;
+}
+
+/**
+ * - 백엔드에서 전달한 AI Worker `/generate` 응답 중 필요한 필드만 정의한다.
  */
 type AiWorkerGenerateResponse = {
   query: string;
@@ -57,20 +101,10 @@ type AiWorkerGenerateResponse = {
 };
 
 /**
- * - AI Worker `/extract` 성공 응답 중 작성 화면에 필요한 필드만 정의한다.
+ * - 백엔드에서 전달한 AI Worker `/extract` 응답 중 필요한 필드만 정의한다.
  */
 type AiWorkerExtractResponse = {
   recipe: AiRecipeDraft;
-};
-
-/**
- * - AI Worker 오류 응답 형태다.
- */
-type AiWorkerErrorResponse = {
-  detail?: {
-    code?: string;
-    message?: string;
-  };
 };
 
 /**
@@ -100,19 +134,6 @@ type AiStepDraft = {
   order?: number;
   description?: string;
 };
-
-/**
- * - AI Worker 오류 응답에서 사용자에게 표시할 메시지를 고른다.
- */
-function getAiWorkerErrorMessage(
-  body: AiWorkerGenerateResponse | AiWorkerExtractResponse | AiWorkerErrorResponse,
-): string {
-  if ('detail' in body && body.detail?.message) {
-    return body.detail.message;
-  }
-
-  return 'AI 레시피 추출 중 오류가 발생했습니다.';
-}
 
 /**
  * - AI Worker 응답을 작성 화면 draft 상태로 변환한다.
