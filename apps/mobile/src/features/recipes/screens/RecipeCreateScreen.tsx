@@ -8,7 +8,7 @@ import { AppButton } from '../../../components/AppButton';
 import { Screen } from '../../../components/Screen';
 import { useAuth } from '../../auth/AuthContext';
 import { AppTheme, useAppTheme } from '../../../theme/useAppTheme';
-import { extractRecipeDraftFromYoutube } from '../services/aiRecipeApi';
+import { extractRecipeDraftFromYoutube, generateRecipeDraftFromQuery } from '../services/aiRecipeApi';
 import { createRecipe, fetchRecipe, updateRecipe } from '../services/recipeApi';
 import {
   CreateRecipeRequest,
@@ -26,11 +26,18 @@ import {
 const initialDraft: RecipeDraft = {
   title: '',
   description: '',
+  servings: '',
   cookingTimeMinutes: '20',
   visibility: 'private',
   ingredients: [{ name: '', amount: '' }],
   steps: [{ description: '' }],
 };
+
+/**
+ * - AI 초안 생성 모달의 입력 방식을 나타낸다.
+ * - query는 음식명 기반 `/generate`, youtube는 유튜브 링크 기반 `/extract`를 호출한다.
+ */
+type AiDraftMode = 'query' | 'youtube';
 
 /**
  * - 레시피 작성/수정 화면이다.
@@ -48,7 +55,8 @@ export function RecipeCreateScreen({ recipeId }: RecipeCreateScreenProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingRecipe, setIsLoadingRecipe] = useState(isEditMode);
   const [isAiModalVisible, setIsAiModalVisible] = useState(false);
-  const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [aiDraftMode, setAiDraftMode] = useState<AiDraftMode>('query');
+  const [aiDraftInput, setAiDraftInput] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
 
   /**
@@ -62,6 +70,7 @@ export function RecipeCreateScreen({ recipeId }: RecipeCreateScreenProps) {
         setDraft({
           title: recipe.title,
           description: recipe.description,
+          servings: recipe.servings ? String(recipe.servings) : '',
           cookingTimeMinutes: recipe.cookingTimeMinutes ? String(recipe.cookingTimeMinutes) : '',
           visibility: recipe.visibility,
           ingredients:
@@ -207,27 +216,30 @@ export function RecipeCreateScreen({ recipeId }: RecipeCreateScreenProps) {
   };
 
   /**
-   * - 유튜브 쇼츠 링크를 AI Worker에 보내 레시피 초안을 가져온다.
+   * - 음식명 또는 유튜브 쇼츠 링크를 AI Worker에 보내 레시피 초안을 가져온다.
    * - 받은 초안은 작성 폼에 채우고 사용자가 저장 전에 검토/수정하게 한다.
    */
   const requestAiDraft = async () => {
-    const trimmedUrl = youtubeUrl.trim();
+    const trimmedInput = aiDraftInput.trim();
 
-    if (!trimmedUrl) {
-      Alert.alert('유튜브 링크를 입력해주세요');
+    if (!trimmedInput) {
+      Alert.alert(aiDraftMode === 'query' ? '음식명을 입력해주세요' : '유튜브 링크를 입력해주세요');
       return;
     }
 
     try {
       setIsExtracting(true);
-      const aiDraft = await extractRecipeDraftFromYoutube(trimmedUrl);
+      const aiDraft =
+        aiDraftMode === 'query'
+          ? await generateRecipeDraftFromQuery(trimmedInput)
+          : await extractRecipeDraftFromYoutube(trimmedInput);
       setDraft((currentDraft) => ({
         ...currentDraft,
         ...aiDraft,
         visibility: currentDraft.visibility,
       }));
       setIsAiModalVisible(false);
-      setYoutubeUrl('');
+      setAiDraftInput('');
       Alert.alert('AI 초안 생성 완료', '내용을 확인하고 필요한 부분을 수정해주세요.');
     } catch (error) {
       Alert.alert(
@@ -276,7 +288,7 @@ export function RecipeCreateScreen({ recipeId }: RecipeCreateScreenProps) {
         </View>
         <View style={styles.aiPanelText}>
           <Text style={[styles.aiTitle, { color: theme.text }]}>AI 초안 만들기</Text>
-          <Text style={[styles.aiSubtitle, { color: theme.textMuted }]}>YouTube Shorts URL</Text>
+          <Text style={[styles.aiSubtitle, { color: theme.textMuted }]}>음식명 또는 YouTube 링크</Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color={theme.textMuted} />
       </Pressable>
@@ -308,6 +320,22 @@ export function RecipeCreateScreen({ recipeId }: RecipeCreateScreenProps) {
         </Field>
 
         <View style={styles.basicRow}>
+          <View style={styles.basicRowItem}>
+            <Field label="몇 인분" themeTextColor={theme.text}>
+              <View style={[styles.timeInputContainer, { backgroundColor: theme.surfaceMuted }]}>
+                <TextInput
+                  keyboardType="number-pad"
+                  placeholder="예: 2"
+                  placeholderTextColor={theme.textMuted}
+                  value={draft.servings}
+                  onChangeText={(servings) => updateDraft({ servings })}
+                  style={[styles.timeInput, { color: theme.text }]}
+                />
+                <Text style={[styles.timeUnit, { color: theme.textMuted }]}>인분</Text>
+              </View>
+            </Field>
+          </View>
+
           <View style={styles.basicRowItem}>
             <Field label="조리 시간" themeTextColor={theme.text}>
               <View style={[styles.timeInputContainer, { backgroundColor: theme.surfaceMuted }]}>
@@ -452,15 +480,45 @@ export function RecipeCreateScreen({ recipeId }: RecipeCreateScreenProps) {
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
-            <Text style={[styles.modalTitle, { color: theme.text }]}>유튜브 쇼츠로 작성</Text>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>AI 초안 만들기</Text>
+            <View style={styles.aiModeSegment}>
+              {(['query', 'youtube'] as AiDraftMode[]).map((mode) => {
+                const isSelected = aiDraftMode === mode;
+
+                return (
+                  <Pressable
+                    key={mode}
+                    accessibilityRole="button"
+                    disabled={isExtracting}
+                    onPress={() => {
+                      setAiDraftMode(mode);
+                      setAiDraftInput('');
+                    }}
+                    style={[
+                      styles.aiModeSegmentItem,
+                      { backgroundColor: isSelected ? theme.primary : theme.surfaceMuted },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.aiModeSegmentText,
+                        { color: isSelected ? theme.primaryText : theme.text },
+                      ]}
+                    >
+                      {mode === 'query' ? '음식명' : 'YouTube 링크'}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
             <TextInput
               autoCapitalize="none"
               autoCorrect={false}
-              keyboardType="url"
-              placeholder="https://youtube.com/shorts/..."
+              keyboardType={aiDraftMode === 'youtube' ? 'url' : 'default'}
+              placeholder={aiDraftMode === 'query' ? '예: 김치볶음밥' : 'https://youtube.com/shorts/...'}
               placeholderTextColor={theme.textMuted}
-              value={youtubeUrl}
-              onChangeText={setYoutubeUrl}
+              value={aiDraftInput}
+              onChangeText={setAiDraftInput}
               style={[styles.input, { backgroundColor: theme.surfaceMuted, color: theme.text }]}
             />
             <View style={styles.modalActions}>
@@ -493,6 +551,7 @@ function toCreateRecipeRequest(draft: RecipeDraft): CreateRecipeRequest {
   return {
     title: draft.title.trim(),
     description: draft.description.trim() || null,
+    servings: toNullableNumber(draft.servings),
     cookingTimeMinutes: toNullableNumber(draft.cookingTimeMinutes),
     visibility: draft.visibility === 'public' ? 'PUBLIC' : 'PRIVATE',
     ingredients: draft.ingredients
@@ -718,10 +777,12 @@ const styles = StyleSheet.create({
   },
   basicRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
   },
   basicRowItem: {
     flex: 1,
+    minWidth: 140,
   },
   segment: {
     flexDirection: 'row',
@@ -821,6 +882,21 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 20,
+    fontWeight: '800',
+  },
+  aiModeSegment: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  aiModeSegmentItem: {
+    alignItems: 'center',
+    borderRadius: 14,
+    flex: 1,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  aiModeSegmentText: {
+    fontSize: 14,
     fontWeight: '800',
   },
   modalActions: {

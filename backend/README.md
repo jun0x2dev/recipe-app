@@ -18,7 +18,7 @@ docker compose -f ../infra/docker-compose.yml up -d postgres
 
 ## 레시피 API
 
-수동 작성 레시피 생성 API가 구현되어 있습니다.
+수동 작성 레시피 생성, 목록, 상세, 수정, 삭제 API가 구현되어 있습니다.
 
 ```http
 POST /api/v1/recipes
@@ -32,6 +32,7 @@ Content-Type: application/json
 {
   "title": "토마토 계란 볶음",
   "description": "아침에 간단히 만드는 볶음 요리",
+  "servings": 2,
   "cookingTimeMinutes": 10,
   "visibility": "PRIVATE",
   "ingredients": [
@@ -45,4 +46,4 @@ Content-Type: application/json
 }
 ```
 
-현재 레시피 테이블은 `recipes`, `recipe_ingredients`, `recipe_steps`로 구성되어 있습니다. 목록, 상세, 수정, 삭제 API는 이후 단계에서 추가합니다.
+현재 레시피 테이블은 `recipes`, `recipe_ingredients`, `recipe_steps`로 구성되어 있습니다. `servings`는 레시피당 하나의 값이므로 `recipes.servings` 컬럼에 저장합니다.

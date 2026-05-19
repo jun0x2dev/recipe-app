@@ -6,6 +6,7 @@ import { AppButton } from '../../../components/AppButton';
 import { Screen } from '../../../components/Screen';
 import { useAppTheme } from '../../../theme/useAppTheme';
 import { useAuth } from '../AuthContext';
+import { SocialLoginButton } from '../components/SocialLoginButton';
 import { loginWithGoogleIdToken, loginWithNaverAccessToken } from '../services/authApi';
 import {
   consumeGoogleRedirectIdToken,
@@ -17,7 +18,7 @@ import { NaverLoginError, requestNaverAccessToken } from '../services/naverLogin
 /**
  * - 앱 로그인 화면이다.
  * - 네이버 SDK에서 access token을 받은 뒤 백엔드 JWT로 교환한다.
- * - 소셜 버튼은 강한 브랜드색보다 중립 버튼 스타일을 우선한다.
+ * - 소셜 버튼은 각 로그인 제공자 브랜드 정책을 반영한 전용 컴포넌트를 사용한다.
  */
 export function LoginScreen() {
   const theme = useAppTheme();
@@ -134,17 +135,15 @@ export function LoginScreen() {
       </View>
 
       <View style={styles.actions}>
-        <AppButton
-          label={isLoading ? '처리 중' : '네이버로 계속하기'}
-          theme={theme}
+        <SocialLoginButton
+          provider="naver"
           disabled={isLoading}
+          isLoading={isLoading}
           onPress={handleNaverLogin}
         />
         {Platform.OS === 'web' ? (
-          <AppButton
-            label="Google로 계속하기"
-            theme={theme}
-            variant="secondary"
+          <SocialLoginButton
+            provider="google"
             disabled={isLoading}
             onPress={handleGoogleLogin}
           />

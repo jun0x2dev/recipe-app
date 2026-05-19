@@ -94,6 +94,9 @@ export function RecipeDetailScreen({ recipeId }: RecipeDetailScreenProps) {
         </View>
         <Text style={[styles.description, { color: theme.textMuted }]}>{recipe.description}</Text>
         <View style={styles.statRow}>
+          {recipe.servings ? (
+            <Text style={[styles.stat, { color: theme.textMuted }]}>{recipe.servings}인분</Text>
+          ) : null}
           <Text style={[styles.stat, { color: theme.textMuted }]}>{recipe.cookingTimeMinutes}분</Text>
           <Text style={[styles.stat, { color: theme.textMuted }]}>조회 {recipe.viewCount}</Text>
           <Text style={[styles.stat, { color: theme.textMuted }]}>좋아요 {recipe.likeCount}</Text>

@@ -15,6 +15,7 @@ export type Recipe = {
   userId: string;
   title: string;
   description: string;
+  servings: number | null;
   cookingTimeMinutes: number;
   visibility: RecipeVisibility;
   ingredients: string[];
@@ -48,6 +49,7 @@ export type CreateRecipeStepRequest = {
 export type CreateRecipeRequest = {
   title: string;
   description: string | null;
+  servings: number | null;
   cookingTimeMinutes: number | null;
   visibility: 'PUBLIC' | 'PRIVATE';
   ingredients: CreateRecipeIngredientRequest[];
@@ -78,6 +80,7 @@ export type RecipeDraftStep = {
 export type RecipeDraft = {
   title: string;
   description: string;
+  servings: string;
   cookingTimeMinutes: string;
   visibility: RecipeVisibility;
   ingredients: RecipeDraftIngredient[];

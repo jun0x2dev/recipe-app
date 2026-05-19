@@ -9,7 +9,7 @@ import java.time.LocalDateTime
 
 /**
  * - 사용자가 작성한 레시피의 기준 엔티티다.
- * - 제목, 설명, 조리 시간, 공개 범위 같은 핵심 메타데이터를 보관한다.
+ * - 제목, 설명, 몇 인분, 조리 시간, 공개 범위 같은 핵심 메타데이터를 보관한다.
  * - 재료와 조리 단계는 순서 보존이 필요하므로 하위 테이블로 분리한다.
  */
 @Entity
@@ -25,6 +25,9 @@ class Recipe private constructor(
 
     @Column(columnDefinition = "text")
     var description: String?,
+
+    @Column(name = "servings")
+    var servings: Int?,
 
     @Column(name = "cooking_time_minutes")
     var cookingTimeMinutes: Int?,
@@ -80,6 +83,7 @@ class Recipe private constructor(
             user: User,
             title: String,
             description: String?,
+            servings: Int?,
             cookingTimeMinutes: Int?,
             visibility: RecipeVisibility
         ): Recipe =
@@ -87,6 +91,7 @@ class Recipe private constructor(
                 user = user,
                 title = title,
                 description = description,
+                servings = servings,
                 cookingTimeMinutes = cookingTimeMinutes,
                 visibility = visibility
             )
@@ -115,11 +120,13 @@ class Recipe private constructor(
     fun update(
         title: String,
         description: String?,
+        servings: Int?,
         cookingTimeMinutes: Int?,
         visibility: RecipeVisibility
     ) {
         this.title = title
         this.description = description
+        this.servings = servings
         this.cookingTimeMinutes = cookingTimeMinutes
         this.visibility = visibility
     }

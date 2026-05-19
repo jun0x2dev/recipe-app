@@ -10,6 +10,7 @@ import jakarta.validation.constraints.Size
 /**
  * - 레시피 수정 API 요청 DTO다.
  * - 생성 요청과 동일한 필드 구조와 검증 규칙을 적용한다.
+ * - servings는 레시피 기본 정보에 속해 전체 수정 요청에서 함께 갱신한다.
  * - 재료와 조리 단계는 전체 교체 방식으로 처리한다.
  */
 data class UpdateRecipeRequest(
@@ -19,6 +20,10 @@ data class UpdateRecipeRequest(
 
     @field:Size(max = 1000, message = "레시피 설명은 1000자 이하로 입력해주세요.")
     val description: String?,
+
+    @field:Min(value = 1, message = "몇 인분은 1인분 이상이어야 합니다.")
+    @field:Max(value = 100, message = "몇 인분은 100인분 이하로 입력해주세요.")
+    val servings: Int?,
 
     @field:Min(value = 1, message = "조리 시간은 1분 이상이어야 합니다.")
     @field:Max(value = 1440, message = "조리 시간은 1440분 이하로 입력해주세요.")

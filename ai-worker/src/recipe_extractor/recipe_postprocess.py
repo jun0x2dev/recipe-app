@@ -217,6 +217,9 @@ def normalize_source(
     if normalized_source in {"none", "null", ""}:
         normalized_source = "unknown"
 
+    if normalized_source == "generated":
+        return "generated"
+
     if text and text in description:
         return "description"
 
@@ -229,7 +232,7 @@ def normalize_source(
     if text and text in metadata_text:
         return "metadata"
 
-    if normalized_source in {"speech", "metadata", "description"}:
+    if normalized_source in {"speech", "metadata", "description", "generated"}:
         return normalized_source
 
     return "unknown"
@@ -240,10 +243,16 @@ def normalize_confidence(confidence: float, source: str, evidence_value: Optiona
 
     bounded = max(0.0, min(confidence, 0.95))
 
+    if source == "generated" and bounded <= 0:
+        return 0.6
+
     if source == "unknown":
         return min(bounded, 0.45)
 
     if source == "metadata":
+        return min(bounded, 0.65)
+
+    if source == "generated":
         return min(bounded, 0.65)
 
     if not evidence_value:

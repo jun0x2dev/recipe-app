@@ -38,7 +38,7 @@ class ExtractionOptions:
     stt_device: str = "cpu"
     stt_compute_type: str = "int8"
     recipe_provider: str = "heuristic"
-    ollama_model: str = "llama3.1"
+    ollama_model: str = "gemma3:12b"
     ollama_url: str = "http://localhost:11434/api/generate"
     enforce_recipe_content: bool = False
 

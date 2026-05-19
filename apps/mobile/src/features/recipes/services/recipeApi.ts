@@ -165,6 +165,7 @@ type RecipeApiResponse = {
   userId: number;
   title: string;
   description: string | null;
+  servings: number | null;
   cookingTimeMinutes: number | null;
   visibility: 'PUBLIC' | 'PRIVATE';
   ingredients: { name: string; amount: string | null }[];
@@ -180,6 +181,7 @@ type RecipeListApiResponse = {
   userId: number;
   title: string;
   description: string | null;
+  servings: number | null;
   cookingTimeMinutes: number | null;
   visibility: 'PUBLIC' | 'PRIVATE';
   viewCount: number;
@@ -194,6 +196,7 @@ function toRecipe(response: RecipeApiResponse): Recipe {
     userId: String(response.userId),
     title: response.title,
     description: response.description ?? '',
+    servings: response.servings ?? null,
     cookingTimeMinutes: response.cookingTimeMinutes ?? 0,
     visibility: response.visibility === 'PUBLIC' ? 'public' : 'private',
     ingredients: response.ingredients.map((ingredient) =>
@@ -213,6 +216,7 @@ function toRecipeFromList(response: RecipeListApiResponse): Recipe {
     userId: String(response.userId),
     title: response.title,
     description: response.description ?? '',
+    servings: response.servings ?? null,
     cookingTimeMinutes: response.cookingTimeMinutes ?? 0,
     visibility: response.visibility === 'PUBLIC' ? 'public' : 'private',
     ingredients: [],
