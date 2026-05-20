@@ -58,8 +58,12 @@ def run_extraction(url: str, options: ExtractionOptions) -> dict[str, Any]:
     if options.enforce_recipe_content:
         ensure_recipe_related(metadata)
 
-    needs_audio = options.download_audio or options.with_stt or options.extract_recipe
-    needs_stt = options.with_stt or options.extract_recipe
+    # TODO: STT 임시 비활성화 - CPU 처리 속도 문제로 오디오 다운로드/STT 건너뜀
+    #       재활성화 시 아래 두 줄을 원래대로 되돌린다:
+    #         needs_audio = options.download_audio or options.with_stt or options.extract_recipe
+    #         needs_stt = options.with_stt or options.extract_recipe
+    needs_audio = options.download_audio or options.with_stt
+    needs_stt = options.with_stt
 
     if needs_audio:
         audio = download_youtube_audio(

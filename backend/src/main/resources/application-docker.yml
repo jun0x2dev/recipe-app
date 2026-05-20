@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/recipe_app
+    username: recipe_user
+    password: recipe_pass
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+jwt:
+  secret: ${JWT_SECRET:docker-dev-secret-key-must-be-at-least-256-bits-for-hs256}
+  access-token-expiry: 3600000
+  refresh-token-expiry: 604800000
