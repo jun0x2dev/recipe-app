@@ -6,9 +6,14 @@
 
 from __future__ import annotations
 
+import os
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
+
+# OLLAMA_BASE_URL 환경변수로 컨테이너 환경에서 호스트 Ollama 주소를 지정한다.
+# 로컬 직접 실행 시에는 localhost 기본값을 사용한다.
+_OLLAMA_GENERATE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434") + "/api/generate"
 
 
 class SimpleExtractRequest(BaseModel):
@@ -22,7 +27,7 @@ class GenerateRecipeRequest(BaseModel):
 
     query: str = Field(..., min_length=1, description="Dish name or recipe request")
     ollama_model: str = Field("gemma3:4b", description="Ollama model name")
-    ollama_url: str = Field("http://localhost:11434/api/generate", description="Ollama generate API URL")
+    ollama_url: str = Field(_OLLAMA_GENERATE_URL, description="Ollama generate API URL")
 
 
 class DebugExtractRequest(BaseModel):
@@ -42,7 +47,7 @@ class DebugExtractRequest(BaseModel):
     stt_compute_type: str = Field("int8", description="STT compute type")
     recipe_provider: Literal["heuristic", "ollama"] = Field("heuristic", description="Recipe extraction provider")
     ollama_model: str = Field("gemma3:4b", description="Ollama model name")
-    ollama_url: str = Field("http://localhost:11434/api/generate", description="Ollama generate API URL")
+    ollama_url: str = Field(_OLLAMA_GENERATE_URL, description="Ollama generate API URL")
     enforce_recipe_content: bool = Field(False, description="Reject non-recipe-looking videos before heavy processing")
 
 

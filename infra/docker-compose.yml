@@ -17,5 +17,38 @@ services:
       timeout: 5s
       retries: 5
 
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: recipe-app-backend
+    restart: unless-stopped
+    ports:
+      - "8089:8089"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - AI_WORKER_BASE_URL=http://ai-worker:8001
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  ai-worker:
+    build:
+      context: ../ai-worker
+      dockerfile: Dockerfile
+    container_name: recipe-app-ai-worker
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      # Ollama는 호스트(Windows)에서 실행된다. host.docker.internal로 접근한다.
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    extra_hosts:
+      # WSL2(Linux) 환경에서 host.docker.internal이 자동 등록되지 않는 문제를 해결한다.
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - whisper_cache:/root/.cache/huggingface
+
 volumes:
   postgres_data:
+  whisper_cache:

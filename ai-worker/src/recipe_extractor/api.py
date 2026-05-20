@@ -7,8 +7,12 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
+
+# OLLAMA_BASE_URL 환경변수로 컨테이너 환경에서 호스트 Ollama 주소를 지정한다.
+_OLLAMA_GENERATE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434") + "/api/generate"
 
 from recipe_extractor.errors import (
     AppError,
@@ -77,6 +81,7 @@ def extract(request: SimpleExtractRequest) -> dict[str, Any]:
         stt_compute_type="int8",
         recipe_provider="ollama",
         ollama_model="gemma3:4b",
+        ollama_url=_OLLAMA_GENERATE_URL,
         enforce_recipe_content=True,
     )
 
@@ -172,7 +177,7 @@ def main() -> None:
             "uvicorn이 설치되어 있지 않습니다. `python -m pip install -e \".[api,stt]\"`를 실행하세요."
         ) from error
 
-    uvicorn.run("recipe_extractor.api:app", host="127.0.0.1", port=8001, reload=False)
+    uvicorn.run("recipe_extractor.api:app", host="0.0.0.0", port=8001, reload=False)
 
 
 if __name__ == "__main__":

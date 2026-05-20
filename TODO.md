@@ -134,8 +134,12 @@
 
 ## 인프라 및 배포
 
-- [ ] Docker 구성 검토 (백엔드 컨테이너화)
+- [x] Docker 구성 검토 (백엔드 컨테이너화)
 - [x] Docker Compose 구성 검토 (PostgreSQL, 호스트 포트 5433)
+- [x] Docker Compose에 backend + ai-worker 서비스 추가 (Ollama는 호스트 실행)
+- [x] 백엔드 Dockerfile 추가 (멀티스테이지 빌드)
+- [x] AI Worker Dockerfile 추가
+- [x] application-docker.yml 추가 (Docker 전용 Spring 프로파일)
 - [ ] AWS EC2 배포 구조 설계
 - [ ] AWS RDS 사용 여부 결정
 - [ ] AWS S3 버킷 정책 설계
