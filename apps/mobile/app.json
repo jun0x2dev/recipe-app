@@ -18,7 +18,8 @@
       "apiBaseUrl": "http://localhost:8089",
       "naverClientId": "DvR6_0MlUmLndqjhbE7n",
       "naverUrlScheme": "com.leejun.recipeapp",
-      "googleWebClientId": "804702637608-t0d9lrq0arlf1kn4hdpsjmvof94mps5e.apps.googleusercontent.com"
+      "googleWebClientId": "804702637608-t0d9lrq0arlf1kn4hdpsjmvof94mps5e.apps.googleusercontent.com",
+      "googleIosClientId": "804702637608-fu6mqarvhmv5rpb6rfcnlm74h2m0o429.apps.googleusercontent.com"
     },
     "web": {
       "bundler": "metro"

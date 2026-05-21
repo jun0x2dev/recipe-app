@@ -3,7 +3,9 @@ package com.leejun.recipeapp.domain.recipe.service.impl
 import com.leejun.recipeapp.domain.auth.repository.UserRepository
 import com.leejun.recipeapp.domain.recipe.dto.*
 import com.leejun.recipeapp.domain.recipe.entity.Recipe
+import com.leejun.recipeapp.domain.recipe.entity.RecipeLike
 import com.leejun.recipeapp.domain.recipe.entity.RecipeVisibility
+import com.leejun.recipeapp.domain.recipe.repository.RecipeLikeRepository
 import com.leejun.recipeapp.domain.recipe.repository.RecipeRepository
 import com.leejun.recipeapp.domain.recipe.service.RecipeService
 import com.leejun.recipeapp.global.exception.CustomException
@@ -21,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class RecipeServiceImpl(
     private val recipeRepository: RecipeRepository,
+    private val recipeLikeRepository: RecipeLikeRepository,
     private val userRepository: UserRepository
 ) : RecipeService {
 
@@ -57,10 +60,10 @@ class RecipeServiceImpl(
                 )
             }
 
-        return RecipeResponse.from(recipeRepository.save(recipe))
+        return RecipeResponse.from(recipeRepository.save(recipe), liked = false)
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     override fun getRecipe(userId: Long, recipeId: Long): RecipeResponse {
         val recipe = findActiveRecipeOrThrow(recipeId)
 
@@ -68,21 +71,33 @@ class RecipeServiceImpl(
             throw CustomException(ErrorCode.RECIPE_ACCESS_DENIED)
         }
 
-        return RecipeResponse.from(recipe)
+        // 본인 레시피가 아닐 때만 조회수를 증가시킨다.
+        if (recipe.user.id != userId) {
+            recipe.incrementViewCount()
+        }
+
+        val liked = recipeLikeRepository.existsByUserIdAndRecipeId(userId, recipeId)
+        return RecipeResponse.from(recipe, liked)
     }
 
     @Transactional(readOnly = true)
     override fun getMyRecipes(userId: Long, keyword: String?, pageable: Pageable): Page<RecipeListResponse> {
         val likeKeyword = keyword?.takeIf { it.isNotBlank() }?.let { "%${it.lowercase()}%" }
         return recipeRepository.findMyRecipes(userId, likeKeyword, pageable)
-            .map { RecipeListResponse.from(it) }
+            .map { recipe ->
+                val liked = recipeLikeRepository.existsByUserIdAndRecipeId(userId, recipe.id)
+                RecipeListResponse.from(recipe, liked)
+            }
     }
 
     @Transactional(readOnly = true)
-    override fun getPublicRecipes(keyword: String?, pageable: Pageable): Page<RecipeListResponse> {
+    override fun getPublicRecipes(userId: Long, keyword: String?, pageable: Pageable): Page<RecipeListResponse> {
         val likeKeyword = keyword?.takeIf { it.isNotBlank() }?.let { "%${it.lowercase()}%" }
         return recipeRepository.findByVisibility(RecipeVisibility.PUBLIC, likeKeyword, pageable)
-            .map { RecipeListResponse.from(it) }
+            .map { recipe ->
+                val liked = recipeLikeRepository.existsByUserIdAndRecipeId(userId, recipe.id)
+                RecipeListResponse.from(recipe, liked)
+            }
     }
 
     @Transactional
@@ -105,13 +120,46 @@ class RecipeServiceImpl(
             request.steps.map { it.description.trim() }
         )
 
-        return RecipeResponse.from(recipeRepository.save(recipe))
+        val liked = recipeLikeRepository.existsByUserIdAndRecipeId(userId, recipeId)
+        return RecipeResponse.from(recipeRepository.save(recipe), liked)
     }
 
     @Transactional
     override fun deleteRecipe(userId: Long, recipeId: Long) {
         val recipe = findOwnedRecipeOrThrow(recipeId, userId)
         recipe.softDelete()
+    }
+
+    @Transactional
+    override fun toggleLike(userId: Long, recipeId: Long): Boolean {
+        val recipe = findActiveRecipeOrThrow(recipeId)
+        val user = userRepository.findById(userId)
+            .orElseThrow { CustomException(ErrorCode.USER_NOT_FOUND) }
+
+        val alreadyLiked = recipeLikeRepository.existsByUserIdAndRecipeId(userId, recipeId)
+
+        if (alreadyLiked) {
+            recipeLikeRepository.deleteByUserIdAndRecipeId(userId, recipeId)
+            recipe.decrementLikeCount()
+            return false
+        } else {
+            recipeLikeRepository.save(RecipeLike.create(user, recipe))
+            recipe.incrementLikeCount()
+            return true
+        }
+    }
+
+    @Transactional(readOnly = true)
+    override fun isLiked(userId: Long, recipeId: Long): Boolean {
+        return recipeLikeRepository.existsByUserIdAndRecipeId(userId, recipeId)
+    }
+
+    @Transactional(readOnly = true)
+    override fun getLikedRecipes(userId: Long, pageable: Pageable): Page<RecipeListResponse> {
+        return recipeRepository.findLikedRecipes(userId, pageable)
+            .map { recipe ->
+                RecipeListResponse.from(recipe, liked = true)
+            }
     }
 
     private fun findActiveRecipeOrThrow(recipeId: Long): Recipe {

@@ -21,6 +21,8 @@ module.exports = () => {
     // SDK 미설치 환경에서는 네이티브 plugin을 등록하지 않는다.
   }
 
+  plugins.push('expo-web-browser');
+
   return {
     ...config,
     plugins,

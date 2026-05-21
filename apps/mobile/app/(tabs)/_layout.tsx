@@ -58,11 +58,11 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="settings"
+        name="menu"
         options={{
-          title: '설정',
+          title: '메뉴',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-circle-outline" color={color} size={size + 4} />
+            <Ionicons name="menu-outline" color={color} size={size + 4} />
           ),
         }}
       />

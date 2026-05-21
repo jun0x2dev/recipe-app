@@ -6,11 +6,14 @@ import com.leejun.recipeapp.domain.recipe.dto.CreateRecipeRequest
 import com.leejun.recipeapp.domain.recipe.dto.RecipeIngredientRequest
 import com.leejun.recipeapp.domain.recipe.dto.RecipeStepRequest
 import com.leejun.recipeapp.domain.recipe.entity.Recipe
+import com.leejun.recipeapp.domain.recipe.entity.RecipeLike
 import com.leejun.recipeapp.domain.recipe.entity.RecipeVisibility
+import com.leejun.recipeapp.domain.recipe.repository.RecipeLikeRepository
 import com.leejun.recipeapp.domain.recipe.repository.RecipeRepository
 import com.leejun.recipeapp.global.exception.CustomException
 import com.leejun.recipeapp.global.exception.ErrorCode
 import io.mockk.every
+import io.mockk.justRun
 import io.mockk.mockk
 import io.mockk.verify
 import org.assertj.core.api.Assertions.assertThat
@@ -27,6 +30,7 @@ import java.util.Optional
 class RecipeServiceImplTest {
 
     private lateinit var recipeRepository: RecipeRepository
+    private lateinit var recipeLikeRepository: RecipeLikeRepository
     private lateinit var userRepository: UserRepository
     private lateinit var recipeService: RecipeServiceImpl
 
@@ -36,8 +40,9 @@ class RecipeServiceImplTest {
     @BeforeEach
     fun setUp() {
         recipeRepository = mockk()
+        recipeLikeRepository = mockk()
         userRepository = mockk()
-        recipeService = RecipeServiceImpl(recipeRepository, userRepository)
+        recipeService = RecipeServiceImpl(recipeRepository, recipeLikeRepository, userRepository)
     }
 
     /**
@@ -102,5 +107,60 @@ class RecipeServiceImplTest {
         }
 
         assertThat(exception.errorCode).isEqualTo(ErrorCode.USER_NOT_FOUND)
+    }
+
+    /**
+     * - 좋아요가 없는 상태에서 토글하면 좋아요가 등록되고 true를 반환하는지 확인한다.
+     */
+    @Test
+    fun `toggleLike creates like when not yet liked`() {
+        val user = User.create("user@example.com", "encoded-password", "user")
+        val recipe = Recipe.create(user, "테스트 레시피", null, null, null, RecipeVisibility.PUBLIC)
+
+        every { recipeRepository.findByIdAndDeletedAtIsNull(1L) } returns recipe
+        every { userRepository.findById(1L) } returns Optional.of(user)
+        every { recipeLikeRepository.existsByUserIdAndRecipeId(1L, 1L) } returns false
+        every { recipeLikeRepository.save(any<RecipeLike>()) } answers { firstArg<RecipeLike>() }
+
+        val result = recipeService.toggleLike(1L, 1L)
+
+        assertThat(result).isTrue()
+        assertThat(recipe.likeCount).isEqualTo(1)
+        verify { recipeLikeRepository.save(any<RecipeLike>()) }
+    }
+
+    /**
+     * - 이미 좋아요한 상태에서 토글하면 좋아요가 삭제되고 false를 반환하는지 확인한다.
+     */
+    @Test
+    fun `toggleLike removes like when already liked`() {
+        val user = User.create("user@example.com", "encoded-password", "user")
+        val recipe = Recipe.create(user, "테스트 레시피", null, null, null, RecipeVisibility.PUBLIC)
+        recipe.incrementLikeCount()
+
+        every { recipeRepository.findByIdAndDeletedAtIsNull(1L) } returns recipe
+        every { userRepository.findById(1L) } returns Optional.of(user)
+        every { recipeLikeRepository.existsByUserIdAndRecipeId(1L, 1L) } returns true
+        justRun { recipeLikeRepository.deleteByUserIdAndRecipeId(1L, 1L) }
+
+        val result = recipeService.toggleLike(1L, 1L)
+
+        assertThat(result).isFalse()
+        assertThat(recipe.likeCount).isEqualTo(0)
+        verify { recipeLikeRepository.deleteByUserIdAndRecipeId(1L, 1L) }
+    }
+
+    /**
+     * - 삭제된 레시피에 좋아요를 시도하면 RECIPE_NOT_FOUND 오류가 발생하는지 확인한다.
+     */
+    @Test
+    fun `toggleLike rejects deleted recipe`() {
+        every { recipeRepository.findByIdAndDeletedAtIsNull(999L) } returns null
+
+        val exception = assertThrows(CustomException::class.java) {
+            recipeService.toggleLike(1L, 999L)
+        }
+
+        assertThat(exception.errorCode).isEqualTo(ErrorCode.RECIPE_NOT_FOUND)
     }
 }

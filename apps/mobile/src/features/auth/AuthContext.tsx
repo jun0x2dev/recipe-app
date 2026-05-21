@@ -1,6 +1,13 @@
-import { createContext, PropsWithChildren, useContext, useMemo, useState } from 'react';
+import * as SecureStore from 'expo-secure-store';
+import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from 'react';
 
-import { AuthState, TokenResponse } from './types/auth';
+import { AuthState, LoginProvider, TokenResponse } from './types/auth';
+
+/**
+ * - 마지막 로그인 제공자를 영속 저장하는 키다.
+ * - 로그아웃 후에도 로그인 화면에서 "최근 로그인 방법"을 표시하기 위해 사용한다.
+ */
+const LAST_PROVIDER_KEY = 'lastLoginProvider';
 
 /**
  * - 앱 전체에서 인증 상태를 공유하기 위한 Context 값이다.
@@ -9,7 +16,9 @@ import { AuthState, TokenResponse } from './types/auth';
  */
 type AuthContextValue = AuthState & {
   userId: string | null;
-  signIn: (tokenResponse: TokenResponse) => void;
+  email: string | null;
+  lastLoginProvider: LoginProvider | null;
+  signIn: (tokenResponse: TokenResponse, provider: LoginProvider) => void;
   signOut: () => void;
 };
 
@@ -31,21 +40,63 @@ function extractUserIdFromToken(accessToken: string): string | null {
 }
 
 /**
+ * - JWT subject에서 이메일을 추출한다.
+ * - 백엔드에서 subject를 email 또는 userId 문자열로 설정한다.
+ * - @가 포함되어 있으면 이메일로 판단한다.
+ */
+function extractEmailFromToken(accessToken: string): string | null {
+  try {
+    const payload = accessToken.split('.')[1];
+    const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    const claims = JSON.parse(decoded);
+    const subject = claims.sub as string | undefined;
+    return subject && subject.includes('@') ? subject : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * - 인증 상태 Provider다.
- * - 로그인 성공 시 백엔드에서 받은 토큰 쌍을 저장한다.
+ * - 로그인 성공 시 백엔드에서 받은 토큰 쌍과 로그인 방법을 저장한다.
  * - 로그아웃은 우선 클라이언트 상태만 비우고 서버 logout API는 다음 단계에서 연결한다.
  */
 export function AuthProvider({ children }: PropsWithChildren) {
   const [tokenResponse, setTokenResponse] = useState<TokenResponse | null>(null);
+  const [loginProvider, setLoginProvider] = useState<LoginProvider | null>(null);
+  const [lastLoginProvider, setLastLoginProvider] = useState<LoginProvider | null>(null);
+
+  /**
+   * - 앱 시작 시 SecureStore에서 마지막 로그인 제공자를 복원한다.
+   * - 로그아웃 후에도 로그인 화면에서 "최근 로그인 방법"을 보여주기 위함이다.
+   */
+  useEffect(() => {
+    SecureStore.getItemAsync(LAST_PROVIDER_KEY).then((stored) => {
+      if (stored === 'naver' || stored === 'google' || stored === 'email') {
+        setLastLoginProvider(stored);
+      }
+    });
+  }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       tokenResponse,
+      loginProvider,
+      lastLoginProvider,
       userId: tokenResponse ? extractUserIdFromToken(tokenResponse.accessToken) : null,
-      signIn: setTokenResponse,
-      signOut: () => setTokenResponse(null),
+      email: tokenResponse ? extractEmailFromToken(tokenResponse.accessToken) : null,
+      signIn: (tokens: TokenResponse, provider: LoginProvider) => {
+        setTokenResponse(tokens);
+        setLoginProvider(provider);
+        setLastLoginProvider(provider);
+        SecureStore.setItemAsync(LAST_PROVIDER_KEY, provider);
+      },
+      signOut: () => {
+        setTokenResponse(null);
+        setLoginProvider(null);
+      },
     }),
-    [tokenResponse],
+    [tokenResponse, loginProvider, lastLoginProvider],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

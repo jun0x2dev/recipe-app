@@ -22,14 +22,16 @@ data class RecipeResponse(
     val viewCount: Long,
     val likeCount: Long,
     val shareCount: Long,
+    val liked: Boolean,
     val createdAt: LocalDateTime?
 ) {
     companion object {
         /**
          * - 저장된 Recipe 엔티티를 API 응답 DTO로 변환한다.
          * - 재료와 조리 단계는 sortOrder 기준 정렬 상태를 보장한다.
+         * - liked는 요청 사용자의 좋아요 여부를 나타낸다.
          */
-        fun from(recipe: Recipe): RecipeResponse =
+        fun from(recipe: Recipe, liked: Boolean): RecipeResponse =
             RecipeResponse(
                 id = recipe.id,
                 userId = recipe.user.id,
@@ -47,6 +49,7 @@ data class RecipeResponse(
                 viewCount = recipe.viewCount,
                 likeCount = recipe.likeCount,
                 shareCount = recipe.shareCount,
+                liked = liked,
                 createdAt = recipe.createdAt
             )
     }

@@ -30,9 +30,17 @@ export type TokenResponse = {
 };
 
 /**
+ * - 소셜 로그인 제공자 식별자다.
+ * - 로그인 성공 시 함께 저장해 메뉴/로그인 화면에서 표시한다.
+ */
+export type LoginProvider = 'naver' | 'google' | 'email';
+
+/**
  * - AuthContext가 보관하는 최소 인증 상태다.
  * - MVP 단계에서는 메모리에만 저장하고 앱 재시작 시 다시 로그인하도록 둔다.
+ * - loginProvider는 어떤 소셜 계정으로 로그인했는지 기록한다.
  */
 export type AuthState = {
   tokenResponse: TokenResponse | null;
+  loginProvider: LoginProvider | null;
 };

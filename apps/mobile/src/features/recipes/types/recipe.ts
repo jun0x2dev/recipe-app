@@ -23,6 +23,7 @@ export type Recipe = {
   viewCount: number;
   likeCount: number;
   shareCount: number;
+  liked: boolean;
   createdAt: string;
 };
 

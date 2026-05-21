@@ -46,6 +46,8 @@ function RootStack() {
           name="recipes/new"
           options={{ presentation: 'modal', title: '레시피 작성' }}
         />
+        <Stack.Screen name="menu/liked-recipes" options={{ title: '좋아요한 레시피' }} />
+        <Stack.Screen name="menu/settings" options={{ title: '설정' }} />
       </Stack>
     </>
   );
