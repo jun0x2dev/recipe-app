@@ -56,7 +56,9 @@ export function RecipeCard({ recipe, theme, onPress }: RecipeCardProps) {
           <Text style={[styles.metaDot, { color: theme.textMuted }]}>·</Text>
           <Text style={[styles.meta, { color: theme.textMuted }]}>조회 {recipe.viewCount}</Text>
           <Text style={[styles.metaDot, { color: theme.textMuted }]}>·</Text>
-          <Text style={[styles.meta, { color: theme.textMuted }]}>좋아요 {recipe.likeCount}</Text>
+          <Text style={[styles.meta, { color: recipe.liked ? theme.danger : theme.textMuted }]}>
+            {recipe.liked ? '♥' : '♡'} {recipe.likeCount}
+          </Text>
         </View>
       </View>
     </Pressable>

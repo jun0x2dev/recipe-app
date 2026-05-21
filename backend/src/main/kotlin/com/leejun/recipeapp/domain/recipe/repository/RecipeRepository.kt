@@ -48,4 +48,19 @@ interface RecipeRepository : JpaRepository<Recipe, Long> {
         """
     )
     fun findByVisibility(visibility: RecipeVisibility, keyword: String?, pageable: Pageable): Page<Recipe>
+
+    /**
+     * - 특정 사용자가 좋아요한 레시피를 최신 좋아요 순으로 페이징 조회한다.
+     * - 삭제된 레시피는 제외한다.
+     */
+    @Query(
+        """
+        SELECT r FROM Recipe r
+        JOIN RecipeLike rl ON rl.recipe = r
+        WHERE rl.user.id = :userId
+          AND r.deletedAt IS NULL
+        ORDER BY rl.createdAt DESC
+        """
+    )
+    fun findLikedRecipes(userId: Long, pageable: Pageable): Page<Recipe>
 }

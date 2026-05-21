@@ -5,7 +5,6 @@ import { authConfig } from './authConfig';
 /**
  * - Google 로그인 실패를 화면에서 표시하기 위한 도메인 오류다.
  * - 브라우저 OAuth 설정 누락과 사용 불가 플랫폼을 명확히 구분한다.
- * - 네이티브 iOS 흐름은 추후 iOS Client ID 추가 후 별도 확장한다.
  */
 export class GoogleLoginError extends Error {}
 
@@ -61,4 +60,32 @@ export function consumeGoogleRedirectIdToken(): string | null {
   }
 
   return params.get('id_token');
+}
+
+// ── 네이티브 Google 로그인 (expo-auth-session) ──
+
+/**
+ * - 네이티브 Google 로그인 훅의 반환 타입이다.
+ * - 네이티브 모듈 로드 실패 시 null 폴백에서도 동일한 인터페이스를 유지한다.
+ */
+export type NativeGoogleLoginResult = {
+  promptAsync: () => void;
+  isReady: boolean;
+  idToken: string | null;
+};
+
+/**
+ * - expo-auth-session 기반 네이티브 Google 로그인 훅을 안전하게 로드한다.
+ * - expo-application 네이티브 모듈이 없는 환경(Expo Go, 이전 dev build)에서는
+ *   require 시점에 에러가 발생하므로 try/catch로 감싸 null을 반환한다.
+ * - npx expo run:ios로 네이티브 빌드를 갱신하면 정상 동작한다.
+ */
+export function loadNativeGoogleLoginHook(): (() => NativeGoogleLoginResult) | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const mod = require('./googleLoginNative');
+    return mod.useNativeGoogleLogin;
+  } catch {
+    return null;
+  }
 }

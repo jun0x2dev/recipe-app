@@ -51,6 +51,7 @@ class RecipeController(
     /**
      * - 공개 레시피 목록을 페이징 조회한다.
      * - 둘러보기 화면에서 사용한다.
+     * - 각 레시피에 요청 사용자의 좋아요 여부를 포함한다.
      */
     @GetMapping("/public")
     fun getPublicRecipes(
@@ -59,7 +60,8 @@ class RecipeController(
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "20") size: Int
     ): ApiResponse<Page<RecipeListResponse>> {
-        return ApiResponse.ok(recipeService.getPublicRecipes(keyword, PageRequest.of(page, size)))
+        val userId = authentication.principal as Long
+        return ApiResponse.ok(recipeService.getPublicRecipes(userId, keyword, PageRequest.of(page, size)))
     }
 
     /**
@@ -99,5 +101,34 @@ class RecipeController(
     ) {
         val userId = authentication.principal as Long
         recipeService.deleteRecipe(userId, id)
+    }
+
+    /**
+     * - 사용자가 좋아요한 레시피 목록을 페이징 조회한다.
+     * - 메뉴 > 좋아요한 레시피 화면에서 사용한다.
+     */
+    @GetMapping("/liked")
+    fun getLikedRecipes(
+        authentication: Authentication,
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "20") size: Int
+    ): ApiResponse<Page<RecipeListResponse>> {
+        val userId = authentication.principal as Long
+        return ApiResponse.ok(recipeService.getLikedRecipes(userId, PageRequest.of(page, size)))
+    }
+
+    /**
+     * - 레시피 좋아요를 토글한다.
+     * - 이미 좋아요 상태이면 취소, 아니면 등록한다.
+     * - liked: true/false를 반환해 클라이언트가 상태를 갱신할 수 있게 한다.
+     */
+    @PostMapping("/{id}/like")
+    fun toggleLike(
+        authentication: Authentication,
+        @PathVariable id: Long
+    ): ApiResponse<Map<String, Boolean>> {
+        val userId = authentication.principal as Long
+        val liked = recipeService.toggleLike(userId, id)
+        return ApiResponse.ok(mapOf("liked" to liked))
     }
 }

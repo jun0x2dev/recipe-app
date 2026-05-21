@@ -80,6 +80,42 @@ export async function updateRecipe(
 }
 
 /**
+ * - 좋아요한 레시피 목록을 페이징 조회한다.
+ * - 메뉴 > 좋아요한 레시피 화면에서 사용한다.
+ */
+export async function fetchLikedRecipes(
+  accessToken: string,
+  params: { page?: number; size?: number } = {},
+): Promise<PageResponse<Recipe>> {
+  const query = toQueryString(params);
+  const page = await apiFetch<PageResponse<RecipeListApiResponse>>(
+    accessToken,
+    `/api/v1/recipes/liked${query}`,
+  );
+
+  return {
+    ...page!,
+    content: page!.content.map(toRecipeFromList),
+  };
+}
+
+/**
+ * - 레시피 좋아요를 토글한다.
+ * - 이미 좋아요 상태이면 취소, 아니면 등록한다.
+ * - liked: true/false를 반환해 UI 상태를 갱신한다.
+ */
+export async function toggleLike(
+  accessToken: string,
+  recipeId: string,
+): Promise<{ liked: boolean }> {
+  const body = await apiFetch<{ liked: boolean }>(accessToken, `/api/v1/recipes/${recipeId}/like`, {
+    method: 'POST',
+  });
+
+  return body!;
+}
+
+/**
  * - 레시피를 삭제한다.
  */
 export async function deleteRecipe(accessToken: string, recipeId: string): Promise<void> {
@@ -173,6 +209,7 @@ type RecipeApiResponse = {
   viewCount: number;
   likeCount: number;
   shareCount: number;
+  liked: boolean;
   createdAt: string | null;
 };
 
@@ -187,6 +224,7 @@ type RecipeListApiResponse = {
   viewCount: number;
   likeCount: number;
   shareCount: number;
+  liked: boolean;
   createdAt: string | null;
 };
 
@@ -206,6 +244,7 @@ function toRecipe(response: RecipeApiResponse): Recipe {
     viewCount: response.viewCount,
     likeCount: response.likeCount,
     shareCount: response.shareCount,
+    liked: response.liked,
     createdAt: response.createdAt?.slice(0, 10) ?? '',
   };
 }
@@ -224,6 +263,7 @@ function toRecipeFromList(response: RecipeListApiResponse): Recipe {
     viewCount: response.viewCount,
     likeCount: response.likeCount,
     shareCount: response.shareCount,
+    liked: response.liked,
     createdAt: response.createdAt?.slice(0, 10) ?? '',
   };
 }

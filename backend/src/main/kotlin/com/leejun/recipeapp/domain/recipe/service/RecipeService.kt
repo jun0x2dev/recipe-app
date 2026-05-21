@@ -28,8 +28,9 @@ interface RecipeService {
 
     /**
      * - 공개 레시피 목록을 페이징 조회한다.
+     * - userId를 받아 각 레시피의 좋아요 여부를 함께 반환한다.
      */
-    fun getPublicRecipes(keyword: String?, pageable: Pageable): Page<RecipeListResponse>
+    fun getPublicRecipes(userId: Long, keyword: String?, pageable: Pageable): Page<RecipeListResponse>
 
     /**
      * - 본인 레시피를 수정한다.
@@ -40,4 +41,22 @@ interface RecipeService {
      * - 본인 레시피를 논리 삭제한다.
      */
     fun deleteRecipe(userId: Long, recipeId: Long)
+
+    /**
+     * - 레시피 좋아요를 토글한다.
+     * - 이미 좋아요 상태이면 취소하고 false를 반환한다.
+     * - 좋아요 상태가 아니면 등록하고 true를 반환한다.
+     */
+    fun toggleLike(userId: Long, recipeId: Long): Boolean
+
+    /**
+     * - 특정 사용자가 특정 레시피에 좋아요를 눌렀는지 확인한다.
+     */
+    fun isLiked(userId: Long, recipeId: Long): Boolean
+
+    /**
+     * - 사용자가 좋아요한 레시피 목록을 페이징 조회한다.
+     * - 최신 좋아요 순으로 정렬한다.
+     */
+    fun getLikedRecipes(userId: Long, pageable: Pageable): Page<RecipeListResponse>
 }

@@ -19,10 +19,15 @@ data class RecipeListResponse(
     val viewCount: Long,
     val likeCount: Long,
     val shareCount: Long,
+    val liked: Boolean,
     val createdAt: LocalDateTime?
 ) {
     companion object {
-        fun from(recipe: Recipe): RecipeListResponse =
+        /**
+         * - Recipe 엔티티를 목록용 경량 응답 DTO로 변환한다.
+         * - liked는 요청 사용자의 좋아요 여부를 나타낸다.
+         */
+        fun from(recipe: Recipe, liked: Boolean): RecipeListResponse =
             RecipeListResponse(
                 id = recipe.id,
                 userId = recipe.user.id,
@@ -34,6 +39,7 @@ data class RecipeListResponse(
                 viewCount = recipe.viewCount,
                 likeCount = recipe.likeCount,
                 shareCount = recipe.shareCount,
+                liked = liked,
                 createdAt = recipe.createdAt
             )
     }

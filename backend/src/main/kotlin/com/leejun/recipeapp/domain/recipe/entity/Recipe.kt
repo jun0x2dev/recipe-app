@@ -153,6 +153,33 @@ class Recipe private constructor(
     }
 
     /**
+     * - 조회수를 1 증가시킨다.
+     * - 본인 레시피 조회 시에는 호출하지 않는다. (서비스 계층에서 판단)
+     */
+    fun incrementViewCount() {
+        this.viewCount++
+    }
+
+    /**
+     * - 좋아요 수를 1 증가시킨다.
+     * - RecipeLike 생성과 함께 호출한다.
+     */
+    fun incrementLikeCount() {
+        this.likeCount++
+    }
+
+    /**
+     * - 좋아요 수를 1 감소시킨다.
+     * - RecipeLike 삭제와 함께 호출한다.
+     * - 0 이하로 내려가지 않도록 방어한다.
+     */
+    fun decrementLikeCount() {
+        if (this.likeCount > 0) {
+            this.likeCount--
+        }
+    }
+
+    /**
      * - 레시피를 논리 삭제한다.
      * - deletedAt이 설정되면 목록/상세 조회에서 제외된다.
      */

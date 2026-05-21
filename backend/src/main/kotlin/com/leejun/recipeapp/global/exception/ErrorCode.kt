@@ -23,6 +23,7 @@ enum class ErrorCode(
 
     RECIPE_NOT_FOUND(HttpStatus.NOT_FOUND, "레시피를 찾을 수 없습니다."),
     RECIPE_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 레시피에 대한 권한이 없습니다."),
+    RECIPE_LIKE_FAILED(HttpStatus.BAD_REQUEST, "좋아요 처리에 실패했습니다. 대상 레시피가 존재하지 않거나 삭제되었습니다."),
 
     AI_WORKER_UNAVAILABLE(HttpStatus.BAD_GATEWAY, "AI 서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요."),
     AI_WORKER_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "AI 처리 시간이 초과되었습니다. 잠시 후 다시 시도해주세요."),

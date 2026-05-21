@@ -7,7 +7,7 @@ import { Screen } from '../../../components/Screen';
 import { useAuth } from '../../auth/AuthContext';
 import { useAppTheme } from '../../../theme/useAppTheme';
 import { VisibilityBadge } from '../components/VisibilityBadge';
-import { deleteRecipe, fetchRecipe } from '../services/recipeApi';
+import { deleteRecipe, fetchRecipe, toggleLike } from '../services/recipeApi';
 import { Recipe } from '../types/recipe';
 
 type RecipeDetailScreenProps = {
@@ -41,6 +41,29 @@ export function RecipeDetailScreen({ recipeId }: RecipeDetailScreenProps) {
   );
 
   const isOwner = recipe != null && userId != null && recipe.userId === userId;
+  const [isLiking, setIsLiking] = useState(false);
+
+  /**
+   * - 좋아요 버튼을 눌렀을 때 토글 API를 호출한다.
+   * - 성공하면 liked 상태와 likeCount를 로컬에서 즉시 갱신한다.
+   */
+  const handleToggleLike = async () => {
+    if (!tokenResponse?.accessToken || !recipeId || !recipe || isLiking) return;
+
+    setIsLiking(true);
+    try {
+      const { liked } = await toggleLike(tokenResponse.accessToken, recipeId);
+      setRecipe({
+        ...recipe,
+        liked,
+        likeCount: liked ? recipe.likeCount + 1 : recipe.likeCount - 1,
+      });
+    } catch {
+      // 실패 시 상태를 변경하지 않는다.
+    } finally {
+      setIsLiking(false);
+    }
+  };
 
   const handleDelete = () => {
     if (!tokenResponse?.accessToken || !recipeId) return;
@@ -99,7 +122,17 @@ export function RecipeDetailScreen({ recipeId }: RecipeDetailScreenProps) {
           ) : null}
           <Text style={[styles.stat, { color: theme.textMuted }]}>{recipe.cookingTimeMinutes}분</Text>
           <Text style={[styles.stat, { color: theme.textMuted }]}>조회 {recipe.viewCount}</Text>
-          <Text style={[styles.stat, { color: theme.textMuted }]}>좋아요 {recipe.likeCount}</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={recipe.liked ? '좋아요 취소' : '좋아요'}
+            disabled={isLiking}
+            onPress={handleToggleLike}
+            style={({ pressed }) => [styles.likeButton, { opacity: pressed ? 0.6 : 1 }]}
+          >
+            <Text style={[styles.stat, { color: recipe.liked ? theme.danger : theme.textMuted }]}>
+              {recipe.liked ? '♥' : '♡'} {recipe.likeCount}
+            </Text>
+          </Pressable>
           <Text style={[styles.stat, { color: theme.textMuted }]}>공유 {recipe.shareCount}</Text>
         </View>
       </View>
@@ -189,6 +222,10 @@ const styles = StyleSheet.create({
   stat: {
     fontSize: 13,
     fontWeight: '700',
+  },
+  likeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   section: {
     gap: 10,
