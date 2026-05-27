@@ -8,8 +8,10 @@ import com.leejun.recipeapp.domain.recipe.dto.RecipeStepRequest
 import com.leejun.recipeapp.domain.recipe.entity.Recipe
 import com.leejun.recipeapp.domain.recipe.entity.RecipeLike
 import com.leejun.recipeapp.domain.recipe.entity.RecipeVisibility
+import com.leejun.recipeapp.domain.recipe.entity.RecipeCategory
 import com.leejun.recipeapp.domain.recipe.repository.RecipeLikeRepository
 import com.leejun.recipeapp.domain.recipe.repository.RecipeRepository
+import com.leejun.recipeapp.domain.recipe.service.RecipeCategoryClassifier
 import com.leejun.recipeapp.global.exception.CustomException
 import com.leejun.recipeapp.global.exception.ErrorCode
 import io.mockk.every
@@ -32,6 +34,7 @@ class RecipeServiceImplTest {
     private lateinit var recipeRepository: RecipeRepository
     private lateinit var recipeLikeRepository: RecipeLikeRepository
     private lateinit var userRepository: UserRepository
+    private lateinit var categoryClassifier: RecipeCategoryClassifier
     private lateinit var recipeService: RecipeServiceImpl
 
     /**
@@ -42,7 +45,9 @@ class RecipeServiceImplTest {
         recipeRepository = mockk()
         recipeLikeRepository = mockk()
         userRepository = mockk()
-        recipeService = RecipeServiceImpl(recipeRepository, recipeLikeRepository, userRepository)
+        categoryClassifier = mockk()
+        every { categoryClassifier.classify(any()) } returns null
+        recipeService = RecipeServiceImpl(recipeRepository, recipeLikeRepository, userRepository, categoryClassifier)
     }
 
     /**

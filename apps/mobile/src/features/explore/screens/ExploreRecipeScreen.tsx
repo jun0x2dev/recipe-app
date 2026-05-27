@@ -16,7 +16,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { useAppTheme } from '../../../theme/useAppTheme';
 import { RecipeCard } from '../../recipes/components/RecipeCard';
 import { fetchPublicRecipes } from '../../recipes/services/recipeApi';
-import { Recipe } from '../../recipes/types/recipe';
+import { Recipe, RecipeCategory } from '../../recipes/types/recipe';
 
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 400;
@@ -111,6 +111,7 @@ export function ExploreRecipeScreen() {
           title={featured.title}
           description={featured.description}
           cookingTimeMinutes={featured.cookingTimeMinutes}
+          category={featured.category}
           themeText={theme.text}
           themeMuted={theme.textMuted}
           themeSurface={theme.surfaceMuted}
@@ -166,6 +167,7 @@ type PressableFeaturedProps = {
   title: string;
   description: string;
   cookingTimeMinutes: number;
+  category: RecipeCategory | null;
   themeText: string;
   themeMuted: string;
   themeSurface: string;
@@ -176,6 +178,7 @@ function PressableFeatured({
   title,
   description,
   cookingTimeMinutes,
+  category,
   themeText,
   themeMuted,
   themeSurface,
@@ -190,8 +193,10 @@ function PressableFeatured({
         { backgroundColor: themeSurface, opacity: pressed ? 0.78 : 1 },
       ]}
     >
-      <View style={styles.featuredImage}>
-        <Text style={[styles.featuredInitial, { color: themeMuted }]}>{title.slice(0, 1)}</Text>
+      <View style={[styles.featuredImage, category ? { backgroundColor: category.color } : undefined]}>
+        <Text style={category ? styles.featuredEmoji : [styles.featuredInitial, { color: themeMuted }]}>
+          {category?.emoji ?? title.slice(0, 1)}
+        </Text>
       </View>
       <Text style={[styles.featuredMeta, { color: themeMuted }]}>{cookingTimeMinutes}분 레시피</Text>
       <Text style={[styles.featuredTitle, { color: themeText }]}>{title}</Text>
@@ -242,6 +247,9 @@ const styles = StyleSheet.create({
   featuredInitial: {
     fontSize: 30,
     fontWeight: '900',
+  },
+  featuredEmoji: {
+    fontSize: 36,
   },
   featuredMeta: {
     fontSize: 13,

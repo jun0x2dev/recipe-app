@@ -1,6 +1,6 @@
 import { authConfig } from '../../auth/services/authConfig';
 import { ApiResponse } from '../../auth/types/auth';
-import { CreateRecipeRequest, PageResponse, Recipe, UpdateRecipeRequest } from '../types/recipe';
+import { CreateRecipeRequest, PageResponse, Recipe, RecipeCategory, UpdateRecipeRequest } from '../types/recipe';
 
 /**
  * - 백엔드 레시피 생성 API를 호출한다.
@@ -196,6 +196,16 @@ function toQueryString(params: Record<string, string | number | undefined>): str
 
 // ── 응답 타입 & 변환 ──
 
+/**
+ * - 백엔드 카테고리 응답 타입이다.
+ */
+type CategoryApiResponse = {
+  id: number;
+  name: string;
+  emoji: string;
+  color: string;
+} | null;
+
 type RecipeApiResponse = {
   id: number;
   userId: number;
@@ -204,6 +214,7 @@ type RecipeApiResponse = {
   servings: number | null;
   cookingTimeMinutes: number | null;
   visibility: 'PUBLIC' | 'PRIVATE';
+  category: CategoryApiResponse;
   ingredients: { name: string; amount: string | null }[];
   steps: { order: number; description: string }[];
   viewCount: number;
@@ -221,12 +232,21 @@ type RecipeListApiResponse = {
   servings: number | null;
   cookingTimeMinutes: number | null;
   visibility: 'PUBLIC' | 'PRIVATE';
+  category: CategoryApiResponse;
   viewCount: number;
   likeCount: number;
   shareCount: number;
   liked: boolean;
   createdAt: string | null;
 };
+
+/**
+ * - 백엔드 카테고리 응답을 모바일 타입으로 변환한다.
+ */
+function toCategory(response: CategoryApiResponse): RecipeCategory | null {
+  if (!response) return null;
+  return { id: response.id, name: response.name, emoji: response.emoji, color: response.color };
+}
 
 function toRecipe(response: RecipeApiResponse): Recipe {
   return {
@@ -245,6 +265,7 @@ function toRecipe(response: RecipeApiResponse): Recipe {
     likeCount: response.likeCount,
     shareCount: response.shareCount,
     liked: response.liked,
+    category: toCategory(response.category),
     createdAt: response.createdAt?.slice(0, 10) ?? '',
   };
 }
@@ -264,6 +285,7 @@ function toRecipeFromList(response: RecipeListApiResponse): Recipe {
     likeCount: response.likeCount,
     shareCount: response.shareCount,
     liked: response.liked,
+    category: toCategory(response.category),
     createdAt: response.createdAt?.slice(0, 10) ?? '',
   };
 }
