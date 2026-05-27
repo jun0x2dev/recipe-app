@@ -1,6 +1,7 @@
 package com.leejun.recipeapp.domain.recipe.controller
 
 import com.leejun.recipeapp.domain.recipe.dto.*
+import com.leejun.recipeapp.domain.recipe.repository.RecipeCategoryRepository
 import com.leejun.recipeapp.domain.recipe.service.RecipeService
 import com.leejun.recipeapp.global.response.ApiResponse
 import jakarta.validation.Valid
@@ -17,8 +18,21 @@ import org.springframework.web.bind.annotation.*
 @RestController
 @RequestMapping("/api/v1/recipes")
 class RecipeController(
-    private val recipeService: RecipeService
+    private val recipeService: RecipeService,
+    private val categoryRepository: RecipeCategoryRepository
 ) {
+
+    /**
+     * - 카테고리 목록을 정렬 순서대로 반환한다.
+     * - 모바일 앱에서 카테고리 필터링/표시에 사용한다.
+     */
+    @GetMapping("/categories")
+    fun getCategories(): ApiResponse<List<RecipeCategoryResponse>> {
+        val categories = categoryRepository.findAllByOrderBySortOrderAsc()
+            .map { RecipeCategoryResponse.from(it) }
+        return ApiResponse.ok(categories)
+    }
+
 
     /**
      * - 인증된 사용자의 수동 작성 레시피를 생성한다.

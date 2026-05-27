@@ -110,6 +110,13 @@ export function RecipeDetailScreen({ recipeId }: RecipeDetailScreenProps) {
 
   return (
     <Screen theme={theme}>
+      {recipe.category ? (
+        <View style={[styles.categoryBanner, { backgroundColor: recipe.category.color }]}>
+          <Text style={styles.categoryEmoji}>{recipe.category.emoji}</Text>
+          <Text style={styles.categoryName}>{recipe.category.name}</Text>
+        </View>
+      ) : null}
+
       <View style={[styles.hero, { backgroundColor: theme.surfaceMuted }]}>
         <View style={styles.heroHeader}>
           <Text style={[styles.title, { color: theme.text }]}>{recipe.title}</Text>
@@ -192,6 +199,23 @@ export function RecipeDetailScreen({ recipeId }: RecipeDetailScreenProps) {
 }
 
 const styles = StyleSheet.create({
+  categoryBanner: {
+    alignItems: 'center',
+    borderRadius: 18,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+  },
+  categoryEmoji: {
+    fontSize: 24,
+  },
+  categoryName: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+  },
   hero: {
     borderRadius: 18,
     padding: 20,

@@ -6,6 +6,18 @@
 export type RecipeVisibility = 'public' | 'private';
 
 /**
+ * - 레시피 카테고리 정보다.
+ * - 백엔드에서 제목 키워드 매칭으로 자동 분류된다.
+ * - emoji와 color로 모바일에서 카테고리 썸네일을 동적 렌더링한다.
+ */
+export type RecipeCategory = {
+  id: number;
+  name: string;
+  emoji: string;
+  color: string;
+};
+
+/**
  * - 레시피 목록과 상세 화면에서 사용하는 도메인 타입이다.
  * - 현재는 mock 데이터 기준 필드를 정의한다.
  * - 백엔드 API 응답 스키마가 확정되면 이 타입을 함께 조정한다.
@@ -24,6 +36,7 @@ export type Recipe = {
   likeCount: number;
   shareCount: number;
   liked: boolean;
+  category: RecipeCategory | null;
   createdAt: string;
 };
 

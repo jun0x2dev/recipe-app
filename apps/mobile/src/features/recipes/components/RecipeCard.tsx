@@ -30,9 +30,14 @@ export function RecipeCard({ recipe, theme, onPress }: RecipeCardProps) {
         { backgroundColor: theme.surfaceMuted, opacity: pressed ? 0.78 : 1 },
       ]}
     >
-      <View style={[styles.thumbnail, { backgroundColor: theme.surface }]}>
-        <Text style={[styles.thumbnailText, { color: theme.textMuted }]}>
-          {recipe.title.slice(0, 1)}
+      <View
+        style={[
+          styles.thumbnail,
+          { backgroundColor: recipe.category?.color ?? theme.surface },
+        ]}
+      >
+        <Text style={styles.thumbnailEmoji}>
+          {recipe.category?.emoji ?? recipe.title.slice(0, 1)}
         </Text>
       </View>
       <View style={styles.content}>
@@ -80,9 +85,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 72,
   },
-  thumbnailText: {
-    fontSize: 24,
-    fontWeight: '900',
+  thumbnailEmoji: {
+    fontSize: 30,
   },
   content: {
     flex: 1,

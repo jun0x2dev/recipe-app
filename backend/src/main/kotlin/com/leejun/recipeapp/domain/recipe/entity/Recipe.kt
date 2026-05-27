@@ -48,6 +48,15 @@ class Recipe private constructor(
     @OrderBy("sortOrder asc")
     val steps: MutableList<RecipeStep> = mutableListOf()
 
+    /**
+     * - 레시피의 카테고리다.
+     * - 생성/수정 시 제목 키워드 매칭으로 자동 분류된다.
+     * - null이면 아직 분류되지 않은 상태다.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id")
+    var category: RecipeCategory? = null
+
     @Column(name = "view_count", nullable = false)
     var viewCount: Long = 0
         private set

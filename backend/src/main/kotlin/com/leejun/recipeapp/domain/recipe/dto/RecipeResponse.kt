@@ -17,6 +17,7 @@ data class RecipeResponse(
     val servings: Int?,
     val cookingTimeMinutes: Int?,
     val visibility: RecipeVisibility,
+    val category: RecipeCategoryResponse?,
     val ingredients: List<RecipeIngredientResponse>,
     val steps: List<RecipeStepResponse>,
     val viewCount: Long,
@@ -30,6 +31,7 @@ data class RecipeResponse(
          * - 저장된 Recipe 엔티티를 API 응답 DTO로 변환한다.
          * - 재료와 조리 단계는 sortOrder 기준 정렬 상태를 보장한다.
          * - liked는 요청 사용자의 좋아요 여부를 나타낸다.
+         * - category는 자동 분류된 카테고리 정보를 포함한다.
          */
         fun from(recipe: Recipe, liked: Boolean): RecipeResponse =
             RecipeResponse(
@@ -40,6 +42,7 @@ data class RecipeResponse(
                 servings = recipe.servings,
                 cookingTimeMinutes = recipe.cookingTimeMinutes,
                 visibility = recipe.visibility,
+                category = recipe.category?.let { RecipeCategoryResponse.from(it) },
                 ingredients = recipe.ingredients
                     .sortedBy { it.sortOrder }
                     .map { RecipeIngredientResponse(it.name, it.amount) },

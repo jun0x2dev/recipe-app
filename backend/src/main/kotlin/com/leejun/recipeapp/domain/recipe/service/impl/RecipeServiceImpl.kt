@@ -7,6 +7,7 @@ import com.leejun.recipeapp.domain.recipe.entity.RecipeLike
 import com.leejun.recipeapp.domain.recipe.entity.RecipeVisibility
 import com.leejun.recipeapp.domain.recipe.repository.RecipeLikeRepository
 import com.leejun.recipeapp.domain.recipe.repository.RecipeRepository
+import com.leejun.recipeapp.domain.recipe.service.RecipeCategoryClassifier
 import com.leejun.recipeapp.domain.recipe.service.RecipeService
 import com.leejun.recipeapp.global.exception.CustomException
 import com.leejun.recipeapp.global.exception.ErrorCode
@@ -24,7 +25,8 @@ import org.springframework.transaction.annotation.Transactional
 class RecipeServiceImpl(
     private val recipeRepository: RecipeRepository,
     private val recipeLikeRepository: RecipeLikeRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val categoryClassifier: RecipeCategoryClassifier
 ) : RecipeService {
 
     @Transactional
@@ -40,6 +42,9 @@ class RecipeServiceImpl(
             cookingTimeMinutes = request.cookingTimeMinutes,
             visibility = request.visibility
         )
+
+        // 제목 키워드 매칭으로 카테고리를 자동 분류한다.
+        recipe.category = categoryClassifier.classify(request.title.trim())
 
         request.ingredients
             .mapIndexed { index, ingredient -> index + 1 to ingredient }
@@ -111,6 +116,9 @@ class RecipeServiceImpl(
             cookingTimeMinutes = request.cookingTimeMinutes,
             visibility = request.visibility
         )
+
+        // 제목이 변경되었으면 카테고리를 재분류한다.
+        recipe.category = categoryClassifier.classify(request.title.trim())
 
         recipe.replaceIngredients(
             request.ingredients.map { it.name.trim() to it.amount?.trim()?.ifBlank { null } }

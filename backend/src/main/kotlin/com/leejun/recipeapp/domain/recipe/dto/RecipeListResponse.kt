@@ -16,6 +16,7 @@ data class RecipeListResponse(
     val servings: Int?,
     val cookingTimeMinutes: Int?,
     val visibility: RecipeVisibility,
+    val category: RecipeCategoryResponse?,
     val viewCount: Long,
     val likeCount: Long,
     val shareCount: Long,
@@ -26,6 +27,7 @@ data class RecipeListResponse(
         /**
          * - Recipe 엔티티를 목록용 경량 응답 DTO로 변환한다.
          * - liked는 요청 사용자의 좋아요 여부를 나타낸다.
+         * - category는 자동 분류된 카테고리 정보를 포함한다.
          */
         fun from(recipe: Recipe, liked: Boolean): RecipeListResponse =
             RecipeListResponse(
@@ -36,6 +38,7 @@ data class RecipeListResponse(
                 servings = recipe.servings,
                 cookingTimeMinutes = recipe.cookingTimeMinutes,
                 visibility = recipe.visibility,
+                category = recipe.category?.let { RecipeCategoryResponse.from(it) },
                 viewCount = recipe.viewCount,
                 likeCount = recipe.likeCount,
                 shareCount = recipe.shareCount,
