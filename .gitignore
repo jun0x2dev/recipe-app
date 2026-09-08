@@ -76,6 +76,9 @@ COMMIT.md
 TODO.md
 AI_RECIPE_EXTRACTION_PLAN.md
 
+# Internal docs (design decisions, API specs)
+docs/
+
 # Old README backups
 readme_old.md
 
