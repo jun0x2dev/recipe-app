@@ -10,6 +10,7 @@ import { RecipeDraft } from '../types/recipe';
 export async function generateRecipeDraftFromQuery(
   accessToken: string,
   query: string,
+  signal?: AbortSignal,
 ): Promise<RecipeDraft> {
   const body = await apiFetch<AiWorkerGenerateResponse>(
     accessToken,
@@ -17,6 +18,7 @@ export async function generateRecipeDraftFromQuery(
     {
       method: 'POST',
       body: JSON.stringify({ query }),
+      signal,
     },
   );
 
@@ -31,6 +33,7 @@ export async function generateRecipeDraftFromQuery(
 export async function extractRecipeDraftFromYoutube(
   accessToken: string,
   url: string,
+  signal?: AbortSignal,
 ): Promise<RecipeDraft> {
   const body = await apiFetch<AiWorkerExtractResponse>(
     accessToken,
@@ -38,6 +41,7 @@ export async function extractRecipeDraftFromYoutube(
     {
       method: 'POST',
       body: JSON.stringify({ url }),
+      signal,
     },
   );
 
