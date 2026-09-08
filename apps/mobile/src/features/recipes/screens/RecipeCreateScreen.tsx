@@ -1,11 +1,31 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { ReactNode, useEffect } from 'react';
-import { useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { SvgXml } from 'react-native-svg';
 
-import { AppButton } from '../../../components/AppButton';
-import { Screen } from '../../../components/Screen';
+import {
+  recipeAiIconSvg,
+  recipeCheckIconSvg,
+  recipeLinkIconSvg,
+  recipeWriteIconSvg,
+  recipeYoutubeIconSvg,
+  recipeYoutubeLogoSvg,
+} from '../../../assets/recipe-create';
+import { DdongLottie } from '../../../components/DdongLottie';
 import { useAuth } from '../../auth/AuthContext';
 import { AppTheme, useAppTheme } from '../../../theme/useAppTheme';
 import { extractRecipeDraftFromYoutube, generateRecipeDraftFromQuery } from '../services/aiRecipeApi';
@@ -15,52 +35,70 @@ import {
   RecipeDraft,
   RecipeDraftIngredient,
   RecipeDraftStep,
-  RecipeVisibility,
 } from '../types/recipe';
 
 /**
- * - 새 레시피 입력 폼의 초기 상태다.
- * - MVP 작성 화면에서 필요한 최소 필드만 포함한다.
- * - 백엔드 저장 API 연결 전까지는 화면 상태 검증 용도로 사용한다.
+ * - Figma 레시피 작성 플로우에서 사용하는 기본 draft다.
+ * - 조리시간은 칩 선택값과 API 전송값을 같은 문자열로 관리한다.
+ * - 재료/단계는 사용자가 바로 입력을 시작할 수 있도록 한 줄씩 둔다.
  */
 const initialDraft: RecipeDraft = {
   title: '',
   description: '',
   servings: '',
-  cookingTimeMinutes: '20',
-  visibility: 'private',
+  cookingTimeMinutes: '',
+  visibility: 'public',
   ingredients: [{ name: '', amount: '' }],
   steps: [{ description: '' }],
 };
 
 /**
- * - AI 초안 생성 모달의 입력 방식을 나타낸다.
- * - query는 음식명 기반 `/generate`, youtube는 유튜브 링크 기반 `/extract`를 호출한다.
+ * - 음식명 기반 자동 작성과 유튜브 링크 기반 자동 작성을 구분한다.
+ * - Figma의 Rec_001, Rec_002 화면군과 1:1로 대응한다.
  */
 type AiDraftMode = 'query' | 'youtube';
 
 /**
- * - 레시피 작성/수정 화면이다.
- * - recipeId가 전달되면 수정 모드로 동작한다.
+ * - 작성 화면의 라우팅 가능한 내부 단계다.
+ * - method: 작성 방식 선택
+ * - auto: 유튜브/음식명 입력
+ * - manual*: 직접 작성 단계
+ * - review/success: 검토와 완료 상태
+ */
+type CreateStep = 'method' | 'auto' | 'manual1' | 'manual2' | 'manual3' | 'review' | 'success';
+
+/**
+ * - Lottie JSON 안의 내장 이미지 에셋만 읽기 위한 최소 타입이다.
+ * - Lottie 렌더러가 설치되지 않은 환경에서도 캐릭터 이미지를 fallback으로 보여준다.
+ */
+/**
+ * - 레시피 작성/수정 화면 props다.
+ * - recipeId가 있으면 기존 레시피를 불러와 검토 화면에서 시작한다.
  */
 type RecipeCreateScreenProps = {
   recipeId?: string;
 };
 
+const cookingTimeOptions = ['5', '15', '30', '60'];
+
 export function RecipeCreateScreen({ recipeId }: RecipeCreateScreenProps) {
   const isEditMode = !!recipeId;
   const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const { tokenResponse } = useAuth();
   const [draft, setDraft] = useState<RecipeDraft>(initialDraft);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isLoadingRecipe, setIsLoadingRecipe] = useState(isEditMode);
-  const [isAiModalVisible, setIsAiModalVisible] = useState(false);
-  const [aiDraftMode, setAiDraftMode] = useState<AiDraftMode>('query');
+  const [step, setStep] = useState<CreateStep>(isEditMode ? 'review' : 'method');
+  const [aiDraftMode, setAiDraftMode] = useState<AiDraftMode>('youtube');
   const [aiDraftInput, setAiDraftInput] = useState('');
+  const [isLoadingRecipe, setIsLoadingRecipe] = useState(isEditMode);
   const [isExtracting, setIsExtracting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [titleTouched, setTitleTouched] = useState(false);
+  const aiDraftAbortControllerRef = useRef<AbortController | null>(null);
 
   /**
-   * - 수정 모드에서 기존 레시피 데이터를 불러와 폼에 채운다.
+   * - 수정 모드 진입 시 기존 레시피를 draft 형태로 변환한다.
+   * - Figma의 04_레시피 수정 > 검토 화면처럼 먼저 전체 내용을 보여준다.
    */
   useEffect(() => {
     if (!isEditMode || !tokenResponse?.accessToken || !recipeId) return;
@@ -75,18 +113,14 @@ export function RecipeCreateScreen({ recipeId }: RecipeCreateScreenProps) {
           visibility: recipe.visibility,
           ingredients:
             recipe.ingredients.length > 0
-              ? recipe.ingredients.map((text) => {
-                  const parts = text.split(' ');
-                  const name = parts[0] || '';
-                  const amount = parts.slice(1).join(' ');
-                  return { name, amount };
-                })
+              ? recipe.ingredients.map(splitIngredientText)
               : [{ name: '', amount: '' }],
           steps:
             recipe.steps.length > 0
               ? recipe.steps.map((description) => ({ description }))
               : [{ description: '' }],
         });
+        setStep('review');
       })
       .catch(() => {
         Alert.alert('불러오기 실패', '레시피 정보를 불러올 수 없습니다.');
@@ -96,16 +130,24 @@ export function RecipeCreateScreen({ recipeId }: RecipeCreateScreenProps) {
   }, [isEditMode, tokenResponse?.accessToken, recipeId]);
 
   /**
-   * - 레시피 작성 draft의 일부 필드만 갱신한다.
-   * - 기존 입력값은 유지하고 변경된 값만 병합한다.
+   * - 화면 이탈 시 진행 중인 AI 초안 요청을 중단한다.
+   * - 응답이 뒤늦게 도착해도 이미 떠난 화면의 state를 갱신하지 않게 한다.
+   */
+  useEffect(() => {
+    return () => aiDraftAbortControllerRef.current?.abort();
+  }, []);
+
+  /**
+   * - draft 일부 필드만 갱신한다.
+   * - 단계 전환 중에도 입력 상태를 보존하기 위해 기존 객체와 병합한다.
    */
   const updateDraft = (nextDraft: Partial<RecipeDraft>) => {
     setDraft((currentDraft) => ({ ...currentDraft, ...nextDraft }));
   };
 
   /**
-   * - 특정 재료 행의 일부 필드를 갱신한다.
-   * - 배열을 새로 만들어 React state 변경을 안정적으로 반영한다.
+   * - 재료 입력 행을 갱신한다.
+   * - Figma의 재료명/계량 2개 입력칸을 같은 row state로 묶는다.
    */
   const updateIngredient = (index: number, nextIngredient: Partial<RecipeDraftIngredient>) => {
     setDraft((currentDraft) => ({
@@ -117,9 +159,12 @@ export function RecipeCreateScreen({ recipeId }: RecipeCreateScreenProps) {
   };
 
   /**
-   * - 재료 입력 행을 하나 추가한다.
+   * - 현재 재료 입력값을 칩으로 확정하고 다음 입력 행을 연다.
+   * - 마지막 행이 비어 있으면 불필요한 빈 칩을 만들지 않는다.
    */
   const addIngredient = () => {
+    const lastIngredient = draft.ingredients[draft.ingredients.length - 1];
+    if (!lastIngredient.name.trim() && !lastIngredient.amount.trim()) return;
     setDraft((currentDraft) => ({
       ...currentDraft,
       ingredients: [...currentDraft.ingredients, { name: '', amount: '' }],
@@ -127,35 +172,34 @@ export function RecipeCreateScreen({ recipeId }: RecipeCreateScreenProps) {
   };
 
   /**
-   * - 특정 재료 입력 행을 삭제한다.
-   * - 최소 한 행은 남겨 사용자가 바로 입력을 이어갈 수 있게 한다.
+   * - 특정 재료 칩/입력 행을 삭제한다.
+   * - 모든 행이 삭제되어도 새 입력 행 하나는 유지한다.
    */
   const removeIngredient = (index: number) => {
-    setDraft((currentDraft) => ({
-      ...currentDraft,
-      ingredients:
-        currentDraft.ingredients.length === 1
-          ? [{ name: '', amount: '' }]
-          : currentDraft.ingredients.filter((_, ingredientIndex) => ingredientIndex !== index),
-    }));
+    setDraft((currentDraft) => {
+      const nextIngredients = currentDraft.ingredients.filter((_, ingredientIndex) => ingredientIndex !== index);
+      return { ...currentDraft, ingredients: nextIngredients.length > 0 ? nextIngredients : [{ name: '', amount: '' }] };
+    });
   };
 
   /**
-   * - 특정 조리 단계 행의 설명을 갱신한다.
+   * - 조리 단계 입력 행을 갱신한다.
    */
   const updateStep = (index: number, nextStep: Partial<RecipeDraftStep>) => {
     setDraft((currentDraft) => ({
       ...currentDraft,
-      steps: currentDraft.steps.map((step, stepIndex) =>
-        stepIndex === index ? { ...step, ...nextStep } : step,
+      steps: currentDraft.steps.map((recipeStep, stepIndex) =>
+        stepIndex === index ? { ...recipeStep, ...nextStep } : recipeStep,
       ),
     }));
   };
 
   /**
-   * - 조리 단계 입력 행을 하나 추가한다.
+   * - 현재 조리 단계 입력값을 번호 칩으로 확정하고 다음 입력 행을 연다.
    */
   const addStep = () => {
+    const lastStep = draft.steps[draft.steps.length - 1];
+    if (!lastStep.description.trim()) return;
     setDraft((currentDraft) => ({
       ...currentDraft,
       steps: [...currentDraft.steps, { description: '' }],
@@ -163,30 +207,81 @@ export function RecipeCreateScreen({ recipeId }: RecipeCreateScreenProps) {
   };
 
   /**
-   * - 특정 조리 단계 행을 삭제한다.
-   * - 최소 한 행은 남겨 작성 화면이 빈 상태로 무너지지 않게 한다.
+   * - 특정 조리 단계 칩/입력 행을 삭제한다.
    */
   const removeStep = (index: number) => {
-    setDraft((currentDraft) => ({
-      ...currentDraft,
-      steps:
-        currentDraft.steps.length === 1
-          ? [{ description: '' }]
-          : currentDraft.steps.filter((_, stepIndex) => stepIndex !== index),
-    }));
+    setDraft((currentDraft) => {
+      const nextSteps = currentDraft.steps.filter((_, stepIndex) => stepIndex !== index);
+      return { ...currentDraft, steps: nextSteps.length > 0 ? nextSteps : [{ description: '' }] };
+    });
   };
 
   /**
-   * - 작성 폼의 최소 validation을 수행한다.
-   * - 제목이 비어 있으면 저장 흐름을 중단한다.
-   * - 로그인 토큰이 있으면 백엔드 레시피 생성 API로 저장한다.
+   * - 음식명/유튜브 링크 자동 작성 요청을 실행한다.
+   * - 완료 후 바로 검토 화면으로 보내 사용자가 저장 전 내용을 확인하게 한다.
    */
-  const saveDraft = async () => {
-    if (!draft.title.trim()) {
-      Alert.alert('제목을 입력해주세요');
+  const requestAiDraft = async () => {
+    const trimmedInput = aiDraftInput.trim();
+    if (!trimmedInput) {
+      Alert.alert(aiDraftMode === 'query' ? '요리 이름을 입력해주세요' : '유튜브 링크를 입력해주세요');
+      return;
+    }
+    if (!tokenResponse?.accessToken) {
+      Alert.alert('로그인이 필요합니다', 'AI 초안 생성을 위해 먼저 로그인해주세요.');
       return;
     }
 
+    try {
+      const abortController = new AbortController();
+      aiDraftAbortControllerRef.current = abortController;
+      setIsExtracting(true);
+      const aiDraft =
+        aiDraftMode === 'query'
+          ? await generateRecipeDraftFromQuery(tokenResponse.accessToken, trimmedInput, abortController.signal)
+          : await extractRecipeDraftFromYoutube(tokenResponse.accessToken, trimmedInput, abortController.signal);
+
+      if (abortController.signal.aborted) return;
+
+      setDraft((currentDraft) => ({
+        ...currentDraft,
+        ...aiDraft,
+        visibility: currentDraft.visibility,
+      }));
+      setAiDraftInput('');
+      setStep('review');
+    } catch (error) {
+      if (isAbortError(error)) return;
+      Alert.alert(
+        'AI 요청 실패',
+        error instanceof Error ? error.message : 'AI 레시피 추출 중 오류가 발생했습니다.',
+      );
+    } finally {
+      aiDraftAbortControllerRef.current = null;
+      setIsExtracting(false);
+    }
+  };
+
+  /**
+   * - 로딩 화면의 뒤로가기를 취소 동작으로 처리한다.
+   * - fetch를 abort하고 사용자가 입력하던 자동 작성 화면으로 되돌린다.
+   */
+  const cancelAiDraftRequest = () => {
+    aiDraftAbortControllerRef.current?.abort();
+    aiDraftAbortControllerRef.current = null;
+    setIsExtracting(false);
+    setStep('auto');
+  };
+
+  /**
+   * - 검토 화면에서 백엔드 생성/수정 API를 호출한다.
+   * - 생성 완료 시 Figma 완료 화면을 보여주고, 수정 완료 시 이전 화면으로 돌아간다.
+   */
+  const saveDraft = async () => {
+    if (!draft.title.trim()) {
+      Alert.alert('요리 이름을 입력해주세요');
+      setStep('manual1');
+      return;
+    }
     if (!tokenResponse?.accessToken) {
       Alert.alert('로그인이 필요합니다', '레시피를 저장하려면 먼저 로그인해주세요.');
       return;
@@ -194,17 +289,15 @@ export function RecipeCreateScreen({ recipeId }: RecipeCreateScreenProps) {
 
     try {
       setIsSaving(true);
-      const request = toCreateRecipeRequest(draft);
-
+      const request = toCreateRecipeRequest(normalizeDraft(draft));
       if (isEditMode && recipeId) {
         await updateRecipe(tokenResponse.accessToken, recipeId, request);
         Alert.alert('수정 완료', '레시피가 수정되었습니다.');
+        router.back();
       } else {
         await createRecipe(tokenResponse.accessToken, request);
-        Alert.alert('저장 완료', '레시피가 저장되었습니다.');
+        setStep('success');
       }
-
-      router.back();
     } catch (error) {
       Alert.alert(
         isEditMode ? '수정 실패' : '저장 실패',
@@ -215,343 +308,812 @@ export function RecipeCreateScreen({ recipeId }: RecipeCreateScreenProps) {
     }
   };
 
-  /**
-   * - 음식명 또는 유튜브 쇼츠 링크를 AI Worker에 보내 레시피 초안을 가져온다.
-   * - 받은 초안은 작성 폼에 채우고 사용자가 저장 전에 검토/수정하게 한다.
-   */
-  const requestAiDraft = async () => {
-    const trimmedInput = aiDraftInput.trim();
-
-    if (!trimmedInput) {
-      Alert.alert(aiDraftMode === 'query' ? '음식명을 입력해주세요' : '유튜브 링크를 입력해주세요');
-      return;
-    }
-
-    if (!tokenResponse?.accessToken) {
-      Alert.alert('로그인이 필요합니다', 'AI 초안 생성을 위해 먼저 로그인해주세요.');
-      return;
-    }
-
-    try {
-      setIsExtracting(true);
-
-      const aiDraft =
-        aiDraftMode === 'query'
-          ? await generateRecipeDraftFromQuery(tokenResponse.accessToken, trimmedInput)
-          : await extractRecipeDraftFromYoutube(tokenResponse.accessToken, trimmedInput);
-      setDraft((currentDraft) => ({
-        ...currentDraft,
-        ...aiDraft,
-        visibility: currentDraft.visibility,
-      }));
-      setIsAiModalVisible(false);
-      setAiDraftInput('');
-      Alert.alert('AI 초안 생성 완료', '내용을 확인하고 필요한 부분을 수정해주세요.');
-    } catch (error) {
-      Alert.alert(
-        'AI 요청 실패',
-        error instanceof Error ? error.message : 'AI 레시피 추출 중 오류가 발생했습니다.',
-      );
-    } finally {
-      setIsExtracting(false);
-    }
-  };
+  const normalizedDraft = normalizeDraft(draft);
+  const activeIngredientIndex = Math.max(draft.ingredients.length - 1, 0);
+  const activeStepIndex = Math.max(draft.steps.length - 1, 0);
+  const hasTitleError = titleTouched && draft.title.trim().length > 20;
+  const canGoStep2 = !!draft.title.trim() && !hasTitleError;
+  const canGoStep3 = normalizedDraft.ingredients.length > 0;
+  const canReview = normalizedDraft.steps.length > 0;
 
   if (isLoadingRecipe) {
     return (
-      <Screen theme={theme}>
-        <ActivityIndicator style={{ marginTop: 40 }} color={theme.textMuted} />
-      </Screen>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.centerState}>
+          <ActivityIndicator color={theme.textMuted} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (isExtracting) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <RecipeHeader styles={styles} onBackPress={cancelAiDraftRequest} />
+        <View style={styles.loadingScreen}>
+          <Text style={styles.loadingTitle}>멋진 요리네요!{'\n'}동글이가 레시피를 작성하고 있어요.</Text>
+          <View style={styles.loadingImageArea}>
+            <LoadingCharacter styles={styles} />
+          </View>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <Screen theme={theme}>
-      <View style={styles.header}>
-        <Text style={[styles.kicker, { color: theme.textMuted }]}>
-          {isEditMode ? '레시피 수정' : '레시피 작성'}
-        </Text>
-        <Text style={[styles.title, { color: theme.text }]}>
-          {isEditMode ? '레시피 수정' : '새 레시피'}
-        </Text>
-      </View>
-
-      <Pressable
-        accessibilityRole="button"
-        disabled={isExtracting}
-        onPress={() => setIsAiModalVisible(true)}
-        style={({ pressed }) => [
-          styles.aiPanel,
-          {
-            backgroundColor: theme.surfaceMuted,
-            borderColor: theme.border,
-            opacity: isExtracting ? 0.55 : pressed ? 0.78 : 1,
-          },
-        ]}
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.keyboardArea}
       >
-        <View style={[styles.aiIcon, { backgroundColor: theme.primary }]}>
-          <Ionicons name="sparkles" size={18} color={theme.primaryText} />
-        </View>
-        <View style={styles.aiPanelText}>
-          <Text style={[styles.aiTitle, { color: theme.text }]}>AI 초안 만들기</Text>
-          <Text style={[styles.aiSubtitle, { color: theme.textMuted }]}>음식명 또는 YouTube 링크</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={20} color={theme.textMuted} />
-      </Pressable>
-
-      <Section title="기본 정보" themeTextColor={theme.text}>
-        <Field label="제목" themeTextColor={theme.text}>
-          <TextInput
-            placeholder="예: 간단한 토마토 파스타"
-            placeholderTextColor={theme.textMuted}
-            value={draft.title}
-            onChangeText={(title) => updateDraft({ title })}
-            style={[styles.input, { backgroundColor: theme.surfaceMuted, color: theme.text }]}
+        {step !== 'success' ? (
+          <RecipeHeader
+            styles={styles}
+            progressStep={toProgressStep(step)}
+            onBackPress={() => handleBack(step, isEditMode, setStep)}
           />
-        </Field>
+        ) : null}
 
-        <Field label="설명" themeTextColor={theme.text}>
-          <TextInput
-            multiline
-            placeholder="레시피를 짧게 설명해주세요"
-            placeholderTextColor={theme.textMuted}
-            value={draft.description}
-            onChangeText={(description) => updateDraft({ description })}
-            style={[
-              styles.input,
-              styles.multiline,
-              { backgroundColor: theme.surfaceMuted, color: theme.text },
-            ]}
+        {step === 'method' ? (
+          <MethodStep
+            styles={styles}
+            setAiDraftMode={setAiDraftMode}
+            setStep={(nextStep) => {
+              setDraft(initialDraft);
+              setAiDraftInput('');
+              setTitleTouched(false);
+              setStep(nextStep);
+            }}
           />
-        </Field>
+        ) : null}
 
-        <View style={styles.basicRow}>
-          <View style={styles.basicRowItem}>
-            <Field label="몇 인분" themeTextColor={theme.text}>
-              <View style={[styles.timeInputContainer, { backgroundColor: theme.surfaceMuted }]}>
-                <TextInput
-                  keyboardType="number-pad"
-                  placeholder="예: 2"
-                  placeholderTextColor={theme.textMuted}
-                  value={draft.servings}
-                  onChangeText={(servings) => updateDraft({ servings })}
-                  style={[styles.timeInput, { color: theme.text }]}
-                />
-                <Text style={[styles.timeUnit, { color: theme.textMuted }]}>인분</Text>
-              </View>
-            </Field>
-          </View>
+        {step === 'auto' ? (
+          <AutoInputStep
+            aiDraftInput={aiDraftInput}
+            aiDraftMode={aiDraftMode}
+            setAiDraftInput={setAiDraftInput}
+            styles={styles}
+            onSubmit={requestAiDraft}
+          />
+        ) : null}
 
-          <View style={styles.basicRowItem}>
-            <Field label="조리 시간" themeTextColor={theme.text}>
-              <View style={[styles.timeInputContainer, { backgroundColor: theme.surfaceMuted }]}>
-                <TextInput
-                  keyboardType="number-pad"
-                  placeholder="예: 20"
-                  placeholderTextColor={theme.textMuted}
-                  value={draft.cookingTimeMinutes}
-                  onChangeText={(cookingTimeMinutes) => updateDraft({ cookingTimeMinutes })}
-                  style={[styles.timeInput, { color: theme.text }]}
-                />
-                <Text style={[styles.timeUnit, { color: theme.textMuted }]}>분</Text>
-              </View>
-            </Field>
-          </View>
-
-          <View style={styles.basicRowItem}>
-            <Field label="공개 여부" themeTextColor={theme.text}>
-              <View style={styles.segment}>
-                {(['private', 'public'] as RecipeVisibility[]).map((visibility) => {
-                  const isSelected = draft.visibility === visibility;
-
-                  return (
-                    <Pressable
-                      key={visibility}
-                      accessibilityRole="button"
-                      onPress={() => updateDraft({ visibility })}
-                      style={[
-                        styles.segmentItem,
-                        {
-                          backgroundColor: isSelected ? theme.primary : theme.surfaceMuted,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.segmentText,
-                          { color: isSelected ? theme.primaryText : theme.text },
-                        ]}
-                      >
-                        {visibility === 'public' ? '공개' : '비공개'}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </Field>
-          </View>
-        </View>
-      </Section>
-
-      <Section
-        title="재료"
-        themeTextColor={theme.text}
-        action={<IconTextButton label="추가" iconName="add" theme={theme} onPress={addIngredient} />}
-      >
-        <View style={styles.repeatList}>
-          {draft.ingredients.map((ingredient, index) => (
-            <View
-              key={`ingredient-${index}`}
-              style={[styles.itemCard, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}
-            >
-              <View style={styles.itemCardHeader}>
-                <Text style={[styles.itemCardTitle, { color: theme.text }]}>재료 {index + 1}</Text>
-                <IconButton iconName="trash-outline" theme={theme} onPress={() => removeIngredient(index)} />
-              </View>
-              <View style={styles.ingredientFields}>
-                <TextInput
-                  placeholder="재료명"
-                  placeholderTextColor={theme.textMuted}
-                  value={ingredient.name}
-                  onChangeText={(name) => updateIngredient(index, { name })}
-                  style={[
-                    styles.input,
-                    styles.ingredientNameInput,
-                    { backgroundColor: theme.surface, color: theme.text },
-                  ]}
-                />
-                <TextInput
-                  placeholder="계량"
-                  placeholderTextColor={theme.textMuted}
-                  value={ingredient.amount}
-                  onChangeText={(amount) => updateIngredient(index, { amount })}
-                  style={[
-                    styles.input,
-                    styles.amountInput,
-                    { backgroundColor: theme.surface, color: theme.text },
-                  ]}
-                />
-              </View>
-            </View>
-          ))}
-        </View>
-      </Section>
-
-      <Section
-        title="조리 단계"
-        themeTextColor={theme.text}
-        action={<IconTextButton label="추가" iconName="add" theme={theme} onPress={addStep} />}
-      >
-        <View style={styles.repeatList}>
-          {draft.steps.map((step, index) => (
-            <View
-              key={`step-${index}`}
-              style={[styles.itemCard, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}
-            >
-              <View style={styles.stepCardHeader}>
-                <View style={[styles.stepBadge, { backgroundColor: theme.primary }]}>
-                  <Text style={[styles.stepBadgeText, { color: theme.primaryText }]}>{index + 1}</Text>
-                </View>
-                <IconButton iconName="trash-outline" theme={theme} onPress={() => removeStep(index)} />
-              </View>
-              <TextInput
-                multiline
-                placeholder="조리 단계를 입력해주세요"
-                placeholderTextColor={theme.textMuted}
-                value={step.description}
-                onChangeText={(description) => updateStep(index, { description })}
-                style={[
-                  styles.input,
-                  styles.stepInput,
-                  { backgroundColor: theme.surface, color: theme.text },
-                ]}
+        {step === 'manual1' ? (
+          <ManualStepShell
+            footer={
+              <BottomActions
+                disabled={!canGoStep2}
+                primaryLabel="다음"
+                styles={styles}
+                onPrimaryPress={() => {
+                  setTitleTouched(true);
+                  if (canGoStep2) setStep('manual2');
+                }}
               />
-            </View>
-          ))}
-        </View>
-      </Section>
-
-      <AppButton
-        label={isSaving ? (isEditMode ? '수정 중...' : '작성 중...') : (isEditMode ? '수정 완료' : '작성 완료')}
-        theme={theme}
-        disabled={isSaving}
-        onPress={saveDraft}
-      />
-
-      <Modal
-        animationType="fade"
-        transparent
-        visible={isAiModalVisible}
-        onRequestClose={() => setIsAiModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
-            <Text style={[styles.modalTitle, { color: theme.text }]}>AI 초안 만들기</Text>
-            <View style={styles.aiModeSegment}>
-              {(['query', 'youtube'] as AiDraftMode[]).map((mode) => {
-                const isSelected = aiDraftMode === mode;
-
-                return (
-                  <Pressable
-                    key={mode}
-                    accessibilityRole="button"
-                    disabled={isExtracting}
-                    onPress={() => {
-                      setAiDraftMode(mode);
-                      setAiDraftInput('');
-                    }}
-                    style={[
-                      styles.aiModeSegmentItem,
-                      { backgroundColor: isSelected ? theme.primary : theme.surfaceMuted },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.aiModeSegmentText,
-                        { color: isSelected ? theme.primaryText : theme.text },
-                      ]}
-                    >
-                      {mode === 'query' ? '음식명' : 'YouTube 링크'}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType={aiDraftMode === 'youtube' ? 'url' : 'default'}
-              placeholder={aiDraftMode === 'query' ? '예: 김치볶음밥' : 'https://youtube.com/shorts/...'}
-              placeholderTextColor={theme.textMuted}
-              value={aiDraftInput}
-              onChangeText={setAiDraftInput}
-              style={[styles.input, { backgroundColor: theme.surfaceMuted, color: theme.text }]}
+            }
+            styles={styles}
+          >
+            <Text style={styles.screenTitle}>요리에 대해서 알려주세요</Text>
+            <InputField
+              errorText={hasTitleError ? '20자 이내로 작성해 주세요' : undefined}
+              isDone={!!draft.title.trim() && !hasTitleError}
+              label="요리 이름"
+              placeholder="예: 멋쟁이 토마토 파스타"
+              styles={styles}
+              value={draft.title}
+              onBlur={() => setTitleTouched(true)}
+              onChangeText={(title) => updateDraft({ title })}
             />
-            <View style={styles.modalActions}>
-              <AppButton
-                label="취소"
-                theme={theme}
-                variant="secondary"
-                disabled={isExtracting}
-                onPress={() => setIsAiModalVisible(false)}
-              />
-              <AppButton
-                label={isExtracting ? '생성 중...' : '초안 생성'}
-                theme={theme}
-                disabled={isExtracting}
-                onPress={requestAiDraft}
-              />
+            <InputField
+              isDone={!!draft.description.trim()}
+              label="설명"
+              placeholder="예: 달콤상큼 맛있어요"
+              styles={styles}
+              value={draft.description}
+              onChangeText={(description) => updateDraft({ description })}
+            />
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>조리시간</Text>
+              <View style={styles.timeGrid}>
+                {cookingTimeOptions.map((minutes) => (
+                  <TimeChip
+                    key={minutes}
+                    isSelected={draft.cookingTimeMinutes === minutes}
+                    label={minutes === '60' ? '1시간 이상' : `${minutes}분`}
+                    styles={styles}
+                    onPress={() => updateDraft({ cookingTimeMinutes: minutes })}
+                  />
+                ))}
+              </View>
             </View>
-          </View>
-        </View>
-      </Modal>
-    </Screen>
+          </ManualStepShell>
+        ) : null}
+
+        {step === 'manual2' ? (
+          <ManualStepShell
+            footer={
+              <BottomActions
+                disabled={!canGoStep3}
+                primaryLabel="다음"
+                secondaryLabel="이전"
+                styles={styles}
+                onPrimaryPress={() => {
+                  if (canGoStep3) setStep('manual3');
+                }}
+                onSecondaryPress={() => setStep('manual1')}
+              />
+            }
+            styles={styles}
+          >
+            <Text style={styles.screenTitle}>어떤 재료가 필요한가요?</Text>
+            <View style={styles.ingredientRow}>
+              <View style={styles.ingredientNameField}>
+                <InputField
+                  isDone={!!draft.ingredients[activeIngredientIndex]?.name.trim()}
+                  label={`재료 ${activeIngredientIndex + 1}`}
+                  placeholder="예: 설탕"
+                  styles={styles}
+                  value={draft.ingredients[activeIngredientIndex]?.name ?? ''}
+                  onChangeText={(name) => updateIngredient(activeIngredientIndex, { name })}
+                />
+              </View>
+              <View style={styles.ingredientAmountField}>
+                <InputField
+                  isDone={!!draft.ingredients[activeIngredientIndex]?.amount.trim()}
+                  label="계량"
+                  placeholder="예: 2스푼"
+                  styles={styles}
+                  value={draft.ingredients[activeIngredientIndex]?.amount ?? ''}
+                  onChangeText={(amount) => updateIngredient(activeIngredientIndex, { amount })}
+                />
+              </View>
+            </View>
+            {draft.ingredients.length > 1 ? (
+              <View style={styles.chipWrap}>
+                {draft.ingredients.slice(0, -1).map((ingredient, index) => (
+                  <EditableChip
+                    key={`ingredient-chip-${index}`}
+                    label={formatIngredient(ingredient)}
+                    styles={styles}
+                    onRemove={() => removeIngredient(index)}
+                  />
+                ))}
+              </View>
+            ) : null}
+            <AddRowButton
+              active={!!draft.ingredients[activeIngredientIndex]?.name.trim() && !!draft.ingredients[activeIngredientIndex]?.amount.trim()}
+              label="추가"
+              styles={styles}
+              onPress={addIngredient}
+            />
+          </ManualStepShell>
+        ) : null}
+
+        {step === 'manual3' ? (
+          <ManualStepShell
+            footer={
+              <BottomActions
+                disabled={!canReview}
+                primaryLabel={isEditMode ? '수정 완료' : '완료'}
+                secondaryLabel="이전"
+                styles={styles}
+                onPrimaryPress={() => {
+                  if (canReview) setStep('review');
+                }}
+                onSecondaryPress={() => setStep('manual2')}
+              />
+            }
+            styles={styles}
+          >
+            <Text style={styles.screenTitle}>조리 단계를 입력해주세요</Text>
+            <InputField
+              isDone={!!draft.steps[activeStepIndex]?.description.trim()}
+              label={`${activeStepIndex + 1}단계`}
+              multiline
+              placeholder="예: 면을 삶아주세요"
+              styles={styles}
+              value={draft.steps[activeStepIndex]?.description ?? ''}
+              onChangeText={(description) => updateStep(activeStepIndex, { description })}
+            />
+            {draft.steps.length > 1 ? (
+              <View style={styles.stepChipList}>
+                {draft.steps.slice(0, -1).map((recipeStep, index) => (
+                  <StepChip
+                    key={`step-chip-${index}`}
+                    index={index}
+                    label={recipeStep.description}
+                    styles={styles}
+                    onRemove={() => removeStep(index)}
+                  />
+                ))}
+              </View>
+            ) : null}
+            <AddRowButton
+              active={!!draft.steps[activeStepIndex]?.description.trim()}
+              label="추가"
+              styles={styles}
+              onPress={addStep}
+            />
+          </ManualStepShell>
+        ) : null}
+
+        {step === 'review' ? (
+          <ReviewStep
+            draft={normalizedDraft}
+            isEditMode={isEditMode}
+            isSaving={isSaving}
+            setStep={setStep}
+            styles={styles}
+            updateDraft={updateDraft}
+            onSave={saveDraft}
+          />
+        ) : null}
+
+        {step === 'success' ? <SuccessStep styles={styles} /> : null}
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 /**
- * - 작성 화면의 draft를 백엔드 생성 API 요청으로 변환한다.
- * - 빈 재료/단계 행은 저장 요청에서 제외한다.
+ * - 작성 방식 선택 화면이다.
+ * - Figma의 Rec_000_001_Write 카드 3개를 React Native Pressable로 옮겼다.
+ */
+function MethodStep({
+  setAiDraftMode,
+  setStep,
+  styles,
+}: {
+  setAiDraftMode: (mode: AiDraftMode) => void;
+  setStep: (step: CreateStep) => void;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <ScrollView contentContainerStyle={styles.content}>
+      <Text style={styles.screenTitle}>레시피를 작성할게요</Text>
+      <View style={styles.methodList}>
+        <MethodCard
+          iconSvg={recipeYoutubeIconSvg}
+          subtitle="레시피 가져오기"
+          title="유튜브 링크로"
+          styles={styles}
+          onPress={() => {
+            setAiDraftMode('youtube');
+            setStep('auto');
+          }}
+        />
+        <MethodCard
+          iconSvg={recipeAiIconSvg}
+          subtitle="레시피 자동 작성"
+          title="요리 이름만 적고"
+          styles={styles}
+          onPress={() => {
+            setAiDraftMode('query');
+            setStep('auto');
+          }}
+        />
+        <MethodCard
+          iconSvg={recipeWriteIconSvg}
+          subtitle="나만의 요리"
+          title="직접 작성하기"
+          styles={styles}
+          onPress={() => setStep('manual1')}
+        />
+      </View>
+    </ScrollView>
+  );
+}
+
+/**
+ * - 유튜브 링크/요리 제목 기반 자동 작성 입력 화면이다.
+ * - 값이 입력되면 하단 CTA를 노출하는 Figma 상태를 따른다.
+ */
+function AutoInputStep({
+  aiDraftInput,
+  aiDraftMode,
+  setAiDraftInput,
+  styles,
+  onSubmit,
+}: {
+  aiDraftInput: string;
+  aiDraftMode: AiDraftMode;
+  setAiDraftInput: (input: string) => void;
+  styles: ReturnType<typeof createStyles>;
+  onSubmit: () => void;
+}) {
+  const isYoutubeMode = aiDraftMode === 'youtube';
+
+  return (
+    <ManualStepShell
+      footer={
+        <BottomActions
+          disabled={!aiDraftInput.trim()}
+          primaryLabel="다음"
+          styles={styles}
+          onPrimaryPress={onSubmit}
+        />
+      }
+      styles={styles}
+    >
+      {isYoutubeMode ? (
+        <View style={styles.autoTitleBlock}>
+          <View style={styles.autoTitleRow}>
+            <Text style={styles.screenTitle}>유튜브 링크로</Text>
+            <SvgXml xml={recipeYoutubeLogoSvg} width={28} height={28} />
+          </View>
+          <Text style={styles.screenTitle}>레시피를 요약해드릴게요!</Text>
+        </View>
+      ) : (
+        <Text style={styles.screenTitle}>요리 이름이 뭔가요?{'\n'}레시피 초안을 작성해드릴게요</Text>
+      )}
+      <InputField
+        autoCapitalize="none"
+        leadingIconSvg={isYoutubeMode ? recipeLinkIconSvg : undefined}
+        isDone={!!aiDraftInput.trim()}
+        keyboardType={isYoutubeMode ? 'url' : 'default'}
+        label={isYoutubeMode ? '유튜브 주소 붙여넣기' : '요리 제목'}
+        placeholder={isYoutubeMode ? 'https://youtube.com/shorts/...' : '예: 프렌치토스트'}
+        styles={styles}
+        value={aiDraftInput}
+        onChangeText={setAiDraftInput}
+      />
+    </ManualStepShell>
+  );
+}
+
+/**
+ * - 직접 작성 단계의 공통 뼈대다.
+ * - 스크롤 컨텐츠와 하단 고정 CTA를 분리해 키보드 등장 시에도 구조가 유지된다.
+ */
+function ManualStepShell({
+  children,
+  footer,
+  styles,
+}: {
+  children: ReactNode;
+  footer: ReactNode;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <View style={styles.stepShell}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {children}
+      </ScrollView>
+      {footer}
+    </View>
+  );
+}
+
+/**
+ * - 작성 결과 검토 화면이다.
+ * - 저장 전 공개 여부와 자동/직접 작성 결과를 한 번에 확인한다.
+ */
+function ReviewStep({
+  draft,
+  isEditMode,
+  isSaving,
+  setStep,
+  styles,
+  updateDraft,
+  onSave,
+}: {
+  draft: RecipeDraft;
+  isEditMode: boolean;
+  isSaving: boolean;
+  setStep: (step: CreateStep) => void;
+  styles: ReturnType<typeof createStyles>;
+  updateDraft: (draft: Partial<RecipeDraft>) => void;
+  onSave: () => void;
+}) {
+  return (
+    <View style={styles.stepShell}>
+      <ScrollView contentContainerStyle={styles.reviewContent}>
+        <View style={styles.reviewTitleBlock}>
+          <Text style={styles.reviewTitle}>{draft.title || '제목 없음'}</Text>
+          <Text style={styles.reviewDescription}>{draft.description || '레시피 설명이 없습니다.'}</Text>
+        </View>
+
+        <View style={styles.ingredientPanel}>
+          {draft.ingredients.map((ingredient, index) => (
+            <Text key={`review-ingredient-${index}`} style={styles.ingredientText}>
+              {'\u2022  '}
+              {formatIngredient(ingredient)}
+            </Text>
+          ))}
+        </View>
+
+        <View style={styles.reviewSection}>
+          <Text style={styles.reviewSectionTitle}>조리방법</Text>
+          <View style={styles.reviewStepList}>
+            {draft.steps.map((recipeStep, index) => (
+              <View key={`review-step-${index}`} style={styles.reviewStepRow}>
+                <View style={styles.numberBadge}>
+                  <Text style={styles.numberBadgeText}>{index + 1}</Text>
+                </View>
+                <Text style={styles.reviewStepText}>{recipeStep.description}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      </ScrollView>
+
+      <View style={styles.visibilityRow}>
+        <Text style={styles.visibilityLabel}>레시피 공개</Text>
+        <Switch
+          ios_backgroundColor={styles.switchTrack.backgroundColor}
+          thumbColor={styles.switchThumb.backgroundColor}
+          trackColor={{
+            false: styles.switchTrack.backgroundColor,
+            true: styles.switchTrackActive.backgroundColor,
+          }}
+          value={draft.visibility === 'public'}
+          onValueChange={(isPublic) => updateDraft({ visibility: isPublic ? 'public' : 'private' })}
+        />
+      </View>
+
+      <BottomActions
+        primaryLabel={isSaving ? (isEditMode ? '수정 중...' : '작성 중...') : isEditMode ? '수정 완료' : '작성 완료'}
+        secondaryLabel="수정"
+        styles={styles}
+        onPrimaryPress={onSave}
+        onSecondaryPress={() => setStep('manual1')}
+      />
+    </View>
+  );
+}
+
+/**
+ * - 레시피 저장 완료 화면이다.
+ * - Figma의 Rec_001_001_Success 문구와 홈 이동 CTA를 반영한다.
+ */
+function SuccessStep({ styles }: { styles: ReturnType<typeof createStyles> }) {
+  return (
+    <View style={styles.successScreen}>
+      <View style={styles.successHeader} />
+      <View style={styles.successContent}>
+        <Text style={styles.successTitle}>레시피 등록이 완료되었어요!</Text>
+        <View style={styles.successImageArea}>
+          <DdongLottie speechText="얍!" style={styles.successCharacter} />
+        </View>
+      </View>
+      <View style={styles.successBottomArea}>
+        <Pressable
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.successHomeButton, { opacity: pressed ? 0.78 : 1 }]}
+          onPress={() => router.replace('/(tabs)')}
+        >
+          <Text style={styles.successHomeButtonText}>홈으로</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+/**
+ * - Rec_000_002_Loading에서 사용하는 동글이 캐릭터 영역이다.
+ * - 로티는 캐릭터 애니메이션만 사용하고, 말풍선/흐릿한 배경은 TSX 공통 컴포넌트가 렌더링한다.
+ */
+function LoadingCharacter({ styles }: { styles: ReturnType<typeof createStyles> }) {
+  return <DdongLottie speechText="얍!" style={styles.loadingCharacter} />;
+}
+
+/**
+ * - Figma 공통 상단 헤더다.
+ * - 직접 작성 단계에서는 3분할 progress indicator를 함께 보여준다.
+ */
+function RecipeHeader({
+  onBackPress,
+  progressStep,
+  showMore = false,
+  styles,
+}: {
+  onBackPress: () => void;
+  progressStep?: number;
+  showMore?: boolean;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <View style={styles.header}>
+      <View style={styles.headerBar}>
+        <Pressable accessibilityRole="button" hitSlop={12} style={styles.headerIconButton} onPress={onBackPress}>
+          <Ionicons name="chevron-back" size={26} color={styles.iconColor.color} />
+        </Pressable>
+        <View style={styles.headerSpacer} />
+        {showMore ? (
+          <Ionicons name="ellipsis-horizontal" size={24} color={styles.iconMutedColor.color} />
+        ) : (
+          <View style={styles.headerIconButton} />
+        )}
+      </View>
+      {progressStep ? (
+        <View style={styles.progress}>
+          {[1, 2, 3].map((index) => (
+            <View
+              key={`progress-${index}`}
+              style={[styles.progressBar, index <= progressStep ? styles.progressBarActive : styles.progressBarInactive]}
+            />
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * - Figma의 Search Input 컴포넌트에 해당하는 입력 필드다.
+ * - 완료 상태에는 체크 아이콘을 표시해 색상만으로 상태를 구분하지 않게 한다.
+ */
+function InputField({
+  autoCapitalize,
+  errorText,
+  leadingIconSvg,
+  isDone = false,
+  keyboardType,
+  label,
+  multiline = false,
+  onBlur,
+  onChangeText,
+  placeholder,
+  styles,
+  value,
+}: {
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  errorText?: string;
+  leadingIconSvg?: string;
+  isDone?: boolean;
+  keyboardType?: 'default' | 'number-pad' | 'url';
+  label: string;
+  multiline?: boolean;
+  onBlur?: () => void;
+  onChangeText: (value: string) => void;
+  placeholder: string;
+  styles: ReturnType<typeof createStyles>;
+  value: string;
+}) {
+  return (
+    <View style={styles.field}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <View style={[styles.inputBox, errorText ? styles.inputBoxError : null, multiline ? styles.inputBoxMultiline : null]}>
+        {leadingIconSvg ? <SvgXml xml={leadingIconSvg} width={24} height={24} /> : null}
+        <TextInput
+          autoCapitalize={autoCapitalize}
+          keyboardType={keyboardType}
+          multiline={multiline}
+          placeholder={placeholder}
+          placeholderTextColor={styles.placeholderColor.color}
+          style={[styles.textInput, multiline ? styles.multilineInput : null]}
+          value={value}
+          onBlur={onBlur}
+          onChangeText={onChangeText}
+        />
+        {isDone ? <SvgXml xml={recipeCheckIconSvg} width={24} height={24} /> : null}
+      </View>
+      {errorText ? <Text style={styles.errorText}>{errorText}</Text> : null}
+    </View>
+  );
+}
+
+/**
+ * - 조리시간 선택 칩이다.
+ */
+function TimeChip({
+  isSelected,
+  label,
+  onPress,
+  styles,
+}: {
+  isSelected: boolean;
+  label: string;
+  onPress: () => void;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        styles.timeChip,
+        isSelected ? styles.timeChipSelected : null,
+        { opacity: pressed ? 0.78 : 1 },
+      ]}
+      onPress={onPress}
+    >
+      <Text style={[styles.timeChipText, isSelected ? styles.timeChipTextSelected : null]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/**
+ * - 재료와 조리 단계에서 사용하는 추가 버튼이다.
+ * - active=true: 입력이 채워졌을 때 흰색 배경 + 테두리 + 진한 텍스트
+ * - active=false: 비활성 반투명 배경 + 연한 텍스트
+ */
+function AddRowButton({
+  active = false,
+  label,
+  onPress,
+  styles,
+}: {
+  active?: boolean;
+  label: string;
+  onPress: () => void;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        styles.addRowButton,
+        active ? styles.addRowButtonActive : null,
+        { opacity: pressed ? 0.78 : 1 },
+      ]}
+      onPress={onPress}
+    >
+      <Ionicons name="add" size={20} color={active ? styles.addRowIconActiveColor.color : styles.addRowIconColor.color} />
+      <Text style={[styles.addRowText, active ? styles.addRowTextActive : null]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/**
+ * - 하단 고정 CTA 영역이다.
+ * - secondary가 있으면 Figma 검토 화면처럼 좌우 버튼을 함께 배치한다.
+ */
+function BottomActions({
+  disabled = false,
+  primaryLabel,
+  secondaryLabel,
+  onPrimaryPress,
+  onSecondaryPress,
+  styles,
+}: {
+  disabled?: boolean;
+  primaryLabel: string;
+  secondaryLabel?: string;
+  onPrimaryPress: () => void;
+  onSecondaryPress?: () => void;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <View style={styles.bottomArea}>
+      {secondaryLabel ? (
+        <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={onSecondaryPress}>
+          <Text style={styles.secondaryButtonText}>{secondaryLabel}</Text>
+        </Pressable>
+      ) : null}
+      <Pressable
+        accessibilityRole="button"
+        disabled={disabled}
+        style={({ pressed }) => [
+          styles.primaryButton,
+          { opacity: disabled ? 0.45 : pressed ? 0.78 : 1 },
+        ]}
+        onPress={onPrimaryPress}
+      >
+        <Text style={styles.primaryButtonText}>{primaryLabel}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/**
+ * - 작성 방식 선택 카드다.
+ */
+function MethodCard({
+  iconSvg,
+  onPress,
+  styles,
+  subtitle,
+  title,
+}: {
+  iconSvg: string;
+  onPress: () => void;
+  styles: ReturnType<typeof createStyles>;
+  subtitle: string;
+  title: string;
+}) {
+  return (
+    <Pressable accessibilityRole="button" style={styles.methodCard} onPress={onPress}>
+      <SvgXml xml={iconSvg} width={32} height={32} />
+      <View style={styles.methodText}>
+        <Text style={styles.methodTitle}>{title}</Text>
+        <Text style={styles.methodSubtitle}>{subtitle}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+/**
+ * - 재료 누적 결과를 표시하는 삭제 가능한 칩이다.
+ */
+function EditableChip({
+  label,
+  onRemove,
+  styles,
+}: {
+  label: string;
+  onRemove: () => void;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <View style={styles.editableChip}>
+      <Text style={styles.editableChipText}>{label}</Text>
+      <Pressable accessibilityRole="button" hitSlop={8} onPress={onRemove}>
+        <Ionicons name="close" size={20} color={styles.iconMutedColor.color} />
+      </Pressable>
+    </View>
+  );
+}
+
+/**
+ * - 조리 단계 누적 결과를 표시하는 번호 칩이다.
+ */
+function StepChip({
+  index,
+  label,
+  onRemove,
+  styles,
+}: {
+  index: number;
+  label: string;
+  onRemove: () => void;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <View style={styles.stepChip}>
+      <View style={styles.numberBadge}>
+        <Text style={styles.numberBadgeText}>{index + 1}</Text>
+      </View>
+      <Text numberOfLines={1} style={styles.stepChipText}>{label}</Text>
+      <Pressable accessibilityRole="button" hitSlop={8} onPress={onRemove}>
+        <Ionicons name="close" size={20} color={styles.iconMutedColor.color} />
+      </Pressable>
+    </View>
+  );
+}
+
+/**
+ * - 헤더 좌상단 뒤로가기 동작을 결정한다.
+ * - method 선택 화면과 수정 모드 검토 화면에서는 화면을 닫는다.
+ * - auto/manual 작성 단계에서도 화면을 닫는다. 하단에 이전 버튼이 있으므로 헤더 뒤로가기는 나가기 역할이다.
+ */
+function handleBack(step: CreateStep, isEditMode: boolean, _setStep: (step: CreateStep) => void) {
+  if (step === 'method' || (step === 'review' && isEditMode)) {
+    router.back();
+    return;
+  }
+  // 작성 중 헤더 뒤로가기는 화면을 완전히 닫는다
+  router.back();
+}
+
+function toProgressStep(step: CreateStep): number | undefined {
+  if (step === 'manual1') return 1;
+  if (step === 'manual2') return 2;
+  if (step === 'manual3') return 3;
+  return undefined;
+}
+
+function splitIngredientText(text: string): RecipeDraftIngredient {
+  const [name = '', ...amountParts] = text.split(' ');
+  return { name, amount: amountParts.join(' ') };
+}
+
+function normalizeDraft(draft: RecipeDraft): RecipeDraft {
+  const ingredients = draft.ingredients.filter((ingredient) => ingredient.name.trim() || ingredient.amount.trim());
+  const steps = draft.steps.filter((recipeStep) => recipeStep.description.trim());
+
+  return {
+    ...draft,
+    ingredients: ingredients.length > 0 ? ingredients : [{ name: '', amount: '' }],
+    steps: steps.length > 0 ? steps : [{ description: '' }],
+  };
+}
+
+function formatIngredient(ingredient: RecipeDraftIngredient): string {
+  return [ingredient.name.trim(), ingredient.amount.trim()].filter(Boolean).join(' ') || '재료 없음';
+}
+
+/**
+ * - 작성 화면의 draft를 백엔드 생성/수정 API 요청으로 변환한다.
+ * - 비어 있는 재료/조리 단계는 저장 요청에서 제외한다.
  */
 function toCreateRecipeRequest(draft: RecipeDraft): CreateRecipeRequest {
   return {
@@ -567,345 +1129,524 @@ function toCreateRecipeRequest(draft: RecipeDraft): CreateRecipeRequest {
       }))
       .filter((ingredient) => ingredient.name),
     steps: draft.steps
-      .map((step) => ({ description: step.description.trim() }))
-      .filter((step) => step.description),
+      .map((recipeStep) => ({ description: recipeStep.description.trim() }))
+      .filter((recipeStep) => recipeStep.description),
   };
 }
 
-/**
- * - 조리 시간 TextInput 값을 nullable number로 변환한다.
- */
 function toNullableNumber(value: string): number | null {
-  const normalized = value.trim();
-  if (!normalized) {
-    return null;
-  }
-
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? parsed : null;
+  const parsed = Number(value.trim());
+  return Number.isFinite(parsed) && value.trim() ? parsed : null;
 }
 
 /**
- * - 입력 필드의 라벨과 컨텐츠를 묶는 내부 컴포넌트 props다.
- * - 화면 단위에서만 사용하므로 별도 공용 컴포넌트로 분리하지 않는다.
+ * - 사용자가 로딩 화면에서 뒤로가기를 눌러 취소한 요청인지 판별한다.
+ * - 취소는 실패 알림을 띄우지 않고 입력 화면으로 조용히 복귀한다.
  */
-type FieldProps = {
-  label: string;
-  themeTextColor: string;
-  children: ReactNode;
-};
-
-/**
- * - 작성 화면의 주요 섹션 props다.
- * - action은 섹션 우측에 놓을 작은 추가 버튼 같은 보조 액션이다.
- */
-type SectionProps = {
-  title: string;
-  themeTextColor: string;
-  action?: ReactNode;
-  children: ReactNode;
-};
-
-/**
- * - 작성 화면의 섹션 레이아웃이다.
- * - 섹션 자체는 카드로 감싸지 않고 제목과 입력 그룹만 묶어 화면 밀도를 낮춘다.
- */
-function Section({ title, themeTextColor, action, children }: SectionProps) {
-  return (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: themeTextColor }]}>{title}</Text>
-        {action}
-      </View>
-      {children}
-    </View>
-  );
+function isAbortError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError';
 }
 
-/**
- * - 레시피 작성 화면의 단일 입력 필드 레이아웃이다.
- * - 라벨 색상은 현재 테마의 텍스트 색상을 따른다.
- * - children으로 TextInput, segmented control 같은 입력 UI를 받는다.
- */
-function Field({ label, themeTextColor, children }: FieldProps) {
-  return (
-    <View style={styles.field}>
-      <Text style={[styles.label, { color: themeTextColor }]}>{label}</Text>
-      {children}
-    </View>
-  );
+function createStyles(theme: AppTheme) {
+  const isDark = theme.mode === 'dark';
+  const colors = {
+    background: isDark ? theme.background : '#ECF0F4',
+    surface: theme.surface,
+    surfaceMuted: isDark ? theme.surfaceMuted : '#E4E9EE',
+    text: isDark ? theme.text : '#343D46',
+    textMuted: '#838A90',
+    textSubtle: isDark ? '#A8B0B8' : '#646D74',
+    border: isDark ? theme.border : '#E4E9EE',
+    primary: isDark ? '#D7DD59' : '#C9CF4B',
+    primarySoft: isDark ? 'rgba(215, 221, 89, 0.18)' : 'rgba(251, 254, 191, 0.6)',
+    button: isDark ? '#F7F8FA' : '#343D46',
+    buttonText: isDark ? '#11141B' : '#FFFFFF',
+    danger: theme.danger,
+  };
+
+  return StyleSheet.create({
+    safeArea: {
+      backgroundColor: colors.background,
+      flex: 1,
+    },
+    keyboardArea: {
+      flex: 1,
+    },
+    centerState: {
+      alignItems: 'center',
+      flex: 1,
+      justifyContent: 'center',
+    },
+    header: {
+      backgroundColor: colors.background,
+    },
+    headerBar: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      height: 56,
+      paddingHorizontal: 16,
+    },
+    headerIconButton: {
+      alignItems: 'center',
+      height: 40,
+      justifyContent: 'center',
+      width: 40,
+    },
+    headerSpacer: {
+      flex: 1,
+    },
+    progress: {
+      flexDirection: 'row',
+      gap: 4,
+      paddingHorizontal: 20,
+    },
+    progressBar: {
+      borderRadius: 99,
+      flex: 1,
+      height: 2,
+    },
+    progressBarActive: {
+      backgroundColor: colors.primary,
+    },
+    progressBarInactive: {
+      backgroundColor: colors.surfaceMuted,
+    },
+    stepShell: {
+      flex: 1,
+    },
+    content: {
+      gap: 32,
+      padding: 20,
+      paddingBottom: 32,
+    },
+    screenTitle: {
+      color: colors.text,
+      fontSize: 22,
+      fontWeight: '700',
+      lineHeight: 31,
+    },
+    methodList: {
+      gap: 12,
+    },
+    autoTitleBlock: {
+      alignItems: 'flex-start',
+    },
+    autoTitleRow: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 4,
+    },
+    methodCard: {
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: 20,
+      flexDirection: 'row',
+      gap: 12,
+      minHeight: 82,
+      padding: 20,
+    },
+    methodText: {
+      flex: 1,
+      gap: 2,
+    },
+    methodTitle: {
+      color: colors.text,
+      fontSize: 18,
+      fontWeight: '700',
+      lineHeight: 25,
+    },
+    methodSubtitle: {
+      color: colors.textMuted,
+      fontSize: 14,
+      fontWeight: '500',
+      lineHeight: 20,
+    },
+    field: {
+      gap: 6,
+    },
+    fieldLabel: {
+      color: colors.textSubtle,
+      fontSize: 14,
+      fontWeight: '500',
+      lineHeight: 20,
+    },
+    inputBox: {
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderColor: 'transparent',
+      borderRadius: 12,
+      borderWidth: 1,
+      flexDirection: 'row',
+      gap: 8,
+      minHeight: 52,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+    },
+    inputBoxError: {
+      borderColor: colors.danger,
+    },
+    inputBoxMultiline: {
+      alignItems: 'flex-start',
+      minHeight: 100,
+      paddingTop: 16,
+    },
+    textInput: {
+      color: colors.text,
+      flex: 1,
+      fontSize: 16,
+      fontWeight: '500',
+      lineHeight: 22,
+      minHeight: 36,
+      padding: 0,
+    },
+    multilineInput: {
+      minHeight: 72,
+      textAlignVertical: 'top',
+    },
+    errorText: {
+      color: colors.danger,
+      fontSize: 13,
+      fontWeight: '500',
+      lineHeight: 18,
+    },
+    timeGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    timeChip: {
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderColor: 'transparent',
+      borderRadius: 8,
+      borderWidth: 1,
+      flexBasis: '48.75%',
+      flexGrow: 1,
+      height: 44,
+      justifyContent: 'center',
+      padding: 10,
+    },
+    timeChipSelected: {
+      backgroundColor: colors.primarySoft,
+      borderColor: colors.primary,
+    },
+    timeChipText: {
+      color: colors.textMuted,
+      fontSize: 16,
+      fontWeight: '500',
+    },
+    timeChipTextSelected: {
+      color: colors.text,
+    },
+    ingredientRow: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    ingredientNameField: {
+      width: 200,
+    },
+    ingredientAmountField: {
+      flex: 1,
+    },
+    chipWrap: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 6,
+    },
+    editableChip: {
+      alignItems: 'center',
+      backgroundColor: isDark ? 'rgba(228, 233, 238, 0.15)' : '#E4E9EE',
+      borderColor: isDark ? theme.border : '#CED6DC',
+      borderRadius: 12,
+      borderWidth: 1,
+      flexDirection: 'row',
+      gap: 8,
+      height: 40,
+      paddingLeft: 12,
+      paddingRight: 10,
+    },
+    editableChipText: {
+      color: isDark ? '#A8B0B8' : '#646D74',
+      fontSize: 16,
+      fontWeight: '500',
+    },
+    stepChipList: {
+      gap: 6,
+    },
+    stepChip: {
+      alignItems: 'center',
+      backgroundColor: isDark ? 'rgba(228, 233, 238, 0.15)' : '#E4E9EE',
+      borderColor: isDark ? theme.border : '#CED6DC',
+      borderRadius: 12,
+      borderWidth: 1,
+      flexDirection: 'row',
+      gap: 8,
+      height: 40,
+      paddingLeft: 12,
+      paddingRight: 10,
+    },
+    stepChipText: {
+      color: isDark ? '#A8B0B8' : '#646D74',
+      flex: 1,
+      fontSize: 16,
+      fontWeight: '500',
+      lineHeight: 22,
+    },
+    addRowButton: {
+      alignItems: 'center',
+      alignSelf: 'center',
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.7)',
+      borderColor: 'transparent',
+      borderRadius: 99,
+      borderWidth: 1,
+      flexDirection: 'row',
+      gap: 2,
+      height: 44,
+      justifyContent: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      width: 120,
+    },
+    addRowButtonActive: {
+      backgroundColor: isDark ? theme.surface : '#FFFFFF',
+      borderColor: isDark ? theme.border : '#CED6DC',
+    },
+    addRowText: {
+      color: '#CED6DC',
+      fontSize: 16,
+      fontWeight: '500',
+      lineHeight: 22,
+      textAlign: 'center',
+    },
+    addRowTextActive: {
+      color: isDark ? '#A8B0B8' : '#646D74',
+    },
+    addRowIconActiveColor: {
+      color: isDark ? '#A8B0B8' : '#646D74',
+    },
+    bottomArea: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      flexDirection: 'row',
+      gap: 16,
+      padding: 20,
+    },
+    primaryButton: {
+      alignItems: 'center',
+      backgroundColor: colors.button,
+      borderRadius: 20,
+      flex: 1,
+      height: 60,
+      justifyContent: 'center',
+      paddingHorizontal: 20,
+    },
+    primaryButtonText: {
+      color: colors.buttonText,
+      fontSize: 18,
+      fontWeight: '500',
+    },
+    secondaryButton: {
+      alignItems: 'center',
+      backgroundColor: isDark ? 'rgba(228, 233, 238, 0.18)' : '#E4E9EE',
+      borderRadius: 20,
+      flex: 1,
+      height: 60,
+      justifyContent: 'center',
+      paddingHorizontal: 10,
+    },
+    secondaryButtonText: {
+      color: isDark ? '#A8B0B8' : '#646D74',
+      fontSize: 18,
+      fontWeight: '500',
+    },
+    reviewContent: {
+      gap: 32,
+      padding: 20,
+      paddingBottom: 40,
+    },
+    reviewTitleBlock: {
+      gap: 4,
+    },
+    reviewTitle: {
+      color: colors.text,
+      fontSize: 22,
+      fontWeight: '700',
+      lineHeight: 31,
+    },
+    reviewDescription: {
+      color: colors.textMuted,
+      fontSize: 16,
+      fontWeight: '500',
+      lineHeight: 22,
+    },
+    ingredientPanel: {
+      backgroundColor: colors.surfaceMuted,
+      borderColor: colors.border,
+      borderRadius: 20,
+      borderWidth: 1,
+      gap: 4,
+      padding: 20,
+    },
+    ingredientText: {
+      color: colors.textSubtle,
+      fontSize: 14,
+      fontWeight: '500',
+      lineHeight: 20,
+    },
+    reviewSection: {
+      gap: 20,
+    },
+    reviewSectionTitle: {
+      color: colors.text,
+      fontSize: 18,
+      fontWeight: '500',
+      lineHeight: 25,
+    },
+    reviewStepList: {
+      gap: 12,
+    },
+    reviewStepRow: {
+      alignItems: 'flex-start',
+      flexDirection: 'row',
+      gap: 8,
+    },
+    numberBadge: {
+      alignItems: 'center',
+      backgroundColor: isDark ? theme.surfaceMuted : '#FFFFFF',
+      borderColor: isDark ? theme.border : '#E4E9EE',
+      borderRadius: 5,
+      borderWidth: 1,
+      height: 24,
+      justifyContent: 'center',
+      width: 24,
+    },
+    numberBadgeText: {
+      color: '#8B95A1',
+      fontSize: 13,
+      fontWeight: '500',
+    },
+    reviewStepText: {
+      color: colors.textMuted,
+      flex: 1,
+      fontSize: 16,
+      fontWeight: '500',
+      lineHeight: 22,
+    },
+    visibilityRow: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingHorizontal: 24,
+      paddingVertical: 8,
+    },
+    visibilityLabel: {
+      color: colors.textMuted,
+      fontSize: 16,
+      fontWeight: '500',
+    },
+    switchTrack: {
+      backgroundColor: colors.surfaceMuted,
+    },
+    switchTrackActive: {
+      backgroundColor: colors.primary,
+    },
+    switchThumb: {
+      backgroundColor: colors.surface,
+    },
+    loadingScreen: {
+      alignItems: 'center',
+      flex: 1,
+      gap: 40,
+      padding: 20,
+    },
+    loadingImageArea: {
+      alignItems: 'center',
+      alignSelf: 'stretch',
+      height: 320,
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    loadingCharacter: {
+      height: 320,
+      width: '100%',
+    },
+    loadingTitle: {
+      alignSelf: 'stretch',
+      color: colors.text,
+      fontSize: 22,
+      fontWeight: '600',
+      lineHeight: 31,
+      textAlign: 'left',
+    },
+    successScreen: {
+      backgroundColor: colors.background,
+      flex: 1,
+    },
+    successHeader: {
+      height: 56,
+    },
+    successContent: {
+      alignItems: 'center',
+      flex: 1,
+      gap: 40,
+      padding: 20,
+    },
+    successImageArea: {
+      alignItems: 'center',
+      alignSelf: 'stretch',
+      height: 320,
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    successCharacter: {
+      height: 320,
+      width: '100%',
+    },
+    successBottomArea: {
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      justifyContent: 'center',
+      padding: 20,
+    },
+    successHomeButton: {
+      alignItems: 'center',
+      backgroundColor: colors.button,
+      borderRadius: 20,
+      height: 60,
+      justifyContent: 'center',
+      padding: 10,
+      width: '100%',
+    },
+    successHomeButtonText: {
+      color: colors.buttonText,
+      fontSize: 18,
+      fontWeight: '500',
+      lineHeight: 25,
+      textAlign: 'center',
+    },
+    successTitle: {
+      alignSelf: 'stretch',
+      color: colors.text,
+      fontSize: 22,
+      fontWeight: '600',
+      lineHeight: 31,
+      textAlign: 'left',
+    },
+    iconColor: {
+      color: colors.text,
+    },
+    iconMutedColor: {
+      color: colors.textMuted,
+    },
+    addRowIconColor: {
+      color: '#CED6DC',
+    },
+    placeholderColor: {
+      color: colors.textMuted,
+    },
+    doneColor: {
+      color: colors.primary,
+    },
+  });
 }
-
-/**
- * - 아이콘과 짧은 텍스트를 함께 보여주는 보조 액션 버튼이다.
- */
-type IconTextButtonProps = {
-  label: string;
-  iconName: keyof typeof Ionicons.glyphMap;
-  theme: AppTheme;
-  onPress: () => void;
-};
-
-/**
- * - 섹션 우측의 작은 추가 버튼이다.
- */
-function IconTextButton({ label, iconName, theme, onPress }: IconTextButtonProps) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.iconTextButton,
-        { backgroundColor: theme.surfaceMuted, opacity: pressed ? 0.78 : 1 },
-      ]}
-    >
-      <Ionicons name={iconName} size={16} color={theme.text} />
-      <Text style={[styles.iconTextButtonLabel, { color: theme.text }]}>{label}</Text>
-    </Pressable>
-  );
-}
-
-/**
- * - 반복 카드에서 사용하는 아이콘 전용 버튼 props다.
- */
-type IconButtonProps = {
-  iconName: keyof typeof Ionicons.glyphMap;
-  theme: AppTheme;
-  onPress: () => void;
-};
-
-/**
- * - 삭제 같은 반복 액션을 compact하게 보여주는 아이콘 버튼이다.
- */
-function IconButton({ iconName, theme, onPress }: IconButtonProps) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.iconOnlyButton,
-        { backgroundColor: theme.surface, opacity: pressed ? 0.78 : 1 },
-      ]}
-    >
-      <Ionicons name={iconName} size={18} color={theme.danger} />
-    </Pressable>
-  );
-}
-
-const styles = StyleSheet.create({
-  header: {
-    alignItems: 'stretch',
-    gap: 6,
-  },
-  kicker: {
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-  },
-  aiPanel: {
-    alignItems: 'center',
-    borderRadius: 16,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 12,
-    minHeight: 76,
-    padding: 16,
-  },
-  aiIcon: {
-    alignItems: 'center',
-    borderRadius: 14,
-    height: 42,
-    justifyContent: 'center',
-    width: 42,
-  },
-  aiPanelText: {
-    flex: 1,
-    gap: 3,
-  },
-  aiTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  aiSubtitle: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  section: {
-    gap: 12,
-  },
-  sectionHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-  },
-  field: {
-    gap: 8,
-  },
-  label: {
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  input: {
-    borderRadius: 14,
-    fontSize: 16,
-    minHeight: 48,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  timeInputContainer: {
-    alignItems: 'center',
-    borderRadius: 14,
-    flexDirection: 'row',
-    minHeight: 48,
-    paddingHorizontal: 14,
-  },
-  timeInput: {
-    flex: 1,
-    fontSize: 16,
-    minHeight: 48,
-    paddingVertical: 12,
-  },
-  timeUnit: {
-    fontSize: 15,
-    fontWeight: '800',
-    paddingLeft: 8,
-  },
-  multiline: {
-    minHeight: 96,
-    textAlignVertical: 'top',
-  },
-  basicRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  basicRowItem: {
-    flex: 1,
-    minWidth: 140,
-  },
-  segment: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  segmentItem: {
-    alignItems: 'center',
-    borderRadius: 14,
-    flex: 1,
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  segmentText: {
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  repeatList: {
-    gap: 10,
-  },
-  itemCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 10,
-    padding: 12,
-  },
-  itemCardHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  itemCardTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  ingredientFields: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  ingredientNameInput: {
-    flex: 1.4,
-  },
-  amountInput: {
-    flex: 1,
-  },
-  stepCardHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  stepBadge: {
-    alignItems: 'center',
-    borderRadius: 12,
-    height: 32,
-    justifyContent: 'center',
-    width: 32,
-  },
-  stepBadgeText: {
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  stepInput: {
-    minHeight: 72,
-    textAlignVertical: 'top',
-  },
-  iconTextButton: {
-    alignItems: 'center',
-    borderRadius: 999,
-    flexDirection: 'row',
-    gap: 4,
-    justifyContent: 'center',
-    minHeight: 34,
-    paddingHorizontal: 12,
-  },
-  iconTextButtonLabel: {
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  iconOnlyButton: {
-    alignItems: 'center',
-    borderRadius: 12,
-    height: 36,
-    justifyContent: 'center',
-    width: 36,
-  },
-  modalOverlay: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    flex: 1,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    borderRadius: 16,
-    gap: 14,
-    padding: 20,
-    width: '100%',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-  },
-  aiModeSegment: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  aiModeSegmentItem: {
-    alignItems: 'center',
-    borderRadius: 14,
-    flex: 1,
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  aiModeSegmentText: {
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  modalActions: {
-    gap: 10,
-  },
-});
