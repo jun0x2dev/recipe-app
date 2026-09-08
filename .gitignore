@@ -67,6 +67,26 @@ application-secret.yaml
 docker-data/
 volumes/
 
+# AI coding tools
+.claude/
+.codex/
+AGENTS.md
+CLAUDE.md
+COMMIT.md
+TODO.md
+AI_RECIPE_EXTRACTION_PLAN.md
+
+# Old README backups
+readme_old.md
+
+# Build cache
+*.tsbuildinfo
+*.hprof
+
+# Android signing
+*.jks
+*.keystore
+
 # Temporary files
 tmp/
 temp/
