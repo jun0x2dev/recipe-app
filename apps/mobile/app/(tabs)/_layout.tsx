@@ -6,7 +6,9 @@ import { useAppTheme } from '../../src/theme/useAppTheme';
 
 /**
  * - 로그인 후 사용하는 하단 탭 레이아웃이다.
- * - 내 레시피, 둘러보기, 설정을 앱의 주요 진입점으로 둔다.
+ * - 피그마 TabBar 기준: 홈, 둘러보기, 오메추, 설정 (4개 탭)
+ * - 높이 60px, 흰색 배경, #ECF0F4 상단 테두리
+ * - 라벨: Pretendard Medium 12px, active #343D46, inactive #BBBBBB
  * - 인증 상태가 없으면 로그인 화면으로 돌려보낸다.
  */
 export default function TabsLayout() {
@@ -24,45 +26,57 @@ export default function TabsLayout() {
         headerStyle: { backgroundColor: theme.background },
         headerTintColor: theme.text,
         headerTitleStyle: { color: theme.text, fontSize: 17, fontWeight: '700' },
-        tabBarActiveTintColor: theme.text,
-        tabBarInactiveTintColor: theme.textMuted,
+        tabBarActiveTintColor: '#343D46',
+        tabBarInactiveTintColor: '#BBBBBB',
         tabBarStyle: {
-          backgroundColor: theme.background,
-          borderTopColor: theme.border,
-          height: 58,
-          paddingBottom: 8,
-          paddingTop: 8,
+          backgroundColor: '#FFFFFF',
+          borderTopColor: '#ECF0F4',
+          borderTopWidth: 1,
+          height: 60,
+          paddingBottom: 6,
+          paddingTop: 6,
         },
         tabBarLabelStyle: {
-          display: 'none',
+          fontSize: 12,
+          fontWeight: '500',
         },
-        tabBarShowLabel: false,
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: '내 레시피',
+          headerShown: false,
+          title: '홈',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="restaurant-outline" color={color} size={size + 3} />
+            <Ionicons name="home-outline" color={color} size={size} />
           ),
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
+          headerShown: false,
           title: '둘러보기',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="compass-outline" color={color} size={size + 3} />
+            <Ionicons name="compass-outline" color={color} size={size} />
           ),
         }}
       />
       <Tabs.Screen
-        name="menu"
+        name="recommend"
         options={{
-          title: '메뉴',
+          title: '오메추',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="menu-outline" color={color} size={size + 4} />
+            <Ionicons name="restaurant-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: '설정',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="settings-outline" color={color} size={size} />
           ),
         }}
       />

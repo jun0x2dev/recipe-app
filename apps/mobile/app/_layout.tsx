@@ -40,11 +40,20 @@ function RootStack() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="login" options={{ title: '로그인' }} />
-        <Stack.Screen name="recipes/[id]" options={{ title: '레시피 상세' }} />
+        <Stack.Screen name="login" options={{ headerShown: false }} />
+        <Stack.Screen name="recipes/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="recipes/[id]/index" options={{ headerShown: false }} />
         <Stack.Screen
           name="recipes/new"
-          options={{ presentation: 'modal', title: '레시피 작성' }}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="recipes/[id]/edit"
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="recipes/[id]/cook"
+          options={{ headerShown: false }}
         />
         <Stack.Screen name="menu/liked-recipes" options={{ title: '좋아요한 레시피' }} />
         <Stack.Screen name="menu/settings" options={{ title: '설정' }} />
