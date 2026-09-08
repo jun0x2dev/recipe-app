@@ -1,5 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { categoryThumbnails } from '../../../assets/categories';
 import { AppTheme } from '../../../theme/useAppTheme';
 import { Recipe } from '../types/recipe';
 import { VisibilityBadge } from './VisibilityBadge';
@@ -21,6 +22,9 @@ type RecipeCardProps = {
  * - Pressable로 감싸 상세 화면 이동 같은 상위 액션을 연결한다.
  */
 export function RecipeCard({ recipe, theme, onPress }: RecipeCardProps) {
+  const thumbnailKey = recipe.category?.thumbnailUrl;
+  const thumbnailSource = thumbnailKey ? categoryThumbnails[thumbnailKey] : undefined;
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -30,15 +34,10 @@ export function RecipeCard({ recipe, theme, onPress }: RecipeCardProps) {
         { backgroundColor: theme.surfaceMuted, opacity: pressed ? 0.78 : 1 },
       ]}
     >
-      <View
-        style={[
-          styles.thumbnail,
-          { backgroundColor: recipe.category?.color ?? theme.surface },
-        ]}
-      >
-        <Text style={styles.thumbnailEmoji}>
-          {recipe.category?.emoji ?? recipe.title.slice(0, 1)}
-        </Text>
+      <View style={[styles.thumbnail, { backgroundColor: theme.surface }]}>
+        {thumbnailSource ? (
+          <Image source={thumbnailSource} style={styles.thumbnailImage} />
+        ) : null}
       </View>
       <View style={styles.content}>
         <View style={styles.header}>
@@ -85,8 +84,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 72,
   },
-  thumbnailEmoji: {
-    fontSize: 30,
+  thumbnailImage: {
+    height: 48,
+    width: 48,
   },
   content: {
     flex: 1,
