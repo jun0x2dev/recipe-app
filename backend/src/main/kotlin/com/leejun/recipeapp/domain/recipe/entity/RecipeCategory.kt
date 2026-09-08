@@ -6,7 +6,8 @@ import java.time.LocalDateTime
 /**
  * - 레시피 카테고리 엔티티다.
  * - 밥, 면, 파스타 등 음식 종류를 분류한다.
- * - emoji와 color는 모바일 앱에서 카테고리 썸네일을 동적 렌더링할 때 사용한다.
+ * - thumbnailUrl은 모바일 앱에서 카테고리 썸네일 이미지를 매핑하는 키다.
+ * - NULL이면 썸네일 없이 표시한다.
  * - 키워드 매칭으로 레시피를 자동 분류하는 기준이 된다.
  */
 @Entity
@@ -20,18 +21,12 @@ class RecipeCategory(
     val name: String,
 
     /**
-     * - 카테고리를 대표하는 이모지다.
-     * - 모바일 앱의 카테고리 썸네일에 표시한다.
+     * - 카테고리 썸네일 이미지 키(또는 URL)다.
+     * - 모바일 앱에서 로컬 에셋 매핑에 사용하며, 추후 S3 URL로 전환 가능하다.
+     * - NULL이면 해당 카테고리의 썸네일을 표시하지 않는다.
      */
-    @Column(nullable = false, length = 10)
-    val emoji: String,
-
-    /**
-     * - 카테고리 썸네일의 배경색 hex 코드다.
-     * - 예: #FF8C42
-     */
-    @Column(nullable = false, length = 7)
-    val color: String,
+    @Column(name = "thumbnail_url", length = 500)
+    val thumbnailUrl: String? = null,
 
     @Column(name = "sort_order", nullable = false)
     val sortOrder: Int = 0,
