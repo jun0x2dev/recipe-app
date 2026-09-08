@@ -8,13 +8,13 @@ export type RecipeVisibility = 'public' | 'private';
 /**
  * - 레시피 카테고리 정보다.
  * - 백엔드에서 제목 키워드 매칭으로 자동 분류된다.
- * - emoji와 color로 모바일에서 카테고리 썸네일을 동적 렌더링한다.
+ * - thumbnailUrl이 있으면 로컬 에셋 매핑으로 썸네일 이미지를 표시한다.
+ * - thumbnailUrl이 null이면 썸네일을 표시하지 않는다.
  */
 export type RecipeCategory = {
   id: number;
   name: string;
-  emoji: string;
-  color: string;
+  thumbnailUrl: string | null;
 };
 
 /**

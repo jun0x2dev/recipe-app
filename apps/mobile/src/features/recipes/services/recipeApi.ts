@@ -198,12 +198,12 @@ function toQueryString(params: Record<string, string | number | undefined>): str
 
 /**
  * - 백엔드 카테고리 응답 타입이다.
+ * - thumbnailUrl이 null이면 해당 카테고리에 썸네일 이미지가 없다.
  */
 type CategoryApiResponse = {
   id: number;
   name: string;
-  emoji: string;
-  color: string;
+  thumbnailUrl: string | null;
 } | null;
 
 type RecipeApiResponse = {
@@ -243,9 +243,12 @@ type RecipeListApiResponse = {
 /**
  * - 백엔드 카테고리 응답을 모바일 타입으로 변환한다.
  */
+/**
+ * - 백엔드 카테고리 응답을 모바일 타입으로 변환한다.
+ */
 function toCategory(response: CategoryApiResponse): RecipeCategory | null {
   if (!response) return null;
-  return { id: response.id, name: response.name, emoji: response.emoji, color: response.color };
+  return { id: response.id, name: response.name, thumbnailUrl: response.thumbnailUrl };
 }
 
 function toRecipe(response: RecipeApiResponse): Recipe {
