@@ -1,11 +1,13 @@
-import { FontAwesome } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { SvgXml } from 'react-native-svg';
+
+import { appleLogoSvg, googleLogoSvg, naverLogoSvg } from '../../../assets/login';
 
 /**
  * - 로그인 제공자별 버튼 종류다.
- * - provider에 따라 색상, 심볼, 접근성 라벨, CTA 문구를 고정한다.
+ * - provider에 따라 색상, 로고, CTA 문구를 고정한다.
  */
-type SocialLoginProvider = 'naver' | 'google';
+type SocialLoginProvider = 'apple' | 'naver' | 'google';
 
 /**
  * - 소셜 로그인 버튼 props다.
@@ -19,9 +21,41 @@ type SocialLoginButtonProps = {
 };
 
 /**
+ * - 제공자별 설정 맵이다.
+ * - 피그마 Hom_000_001_로그인 디자인 기준
+ * - borderRadius 20px, 로고 32x32, space-between 배치
+ */
+const PROVIDER_CONFIG = {
+  apple: {
+    label: 'Apple로 시작하기',
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+    labelColor: '#FFFFFF',
+    svg: appleLogoSvg,
+  },
+  naver: {
+    label: '네이버로 시작하기',
+    backgroundColor: '#03A94D',
+    borderColor: '#03A94D',
+    labelColor: '#FFFFFF',
+    svg: naverLogoSvg,
+  },
+  google: {
+    label: 'Google로 시작하기',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#747775',
+    labelColor: '#1F1F1F',
+    svg: googleLogoSvg,
+  },
+} as const;
+
+/**
  * - 소셜 로그인 전용 Pressable 버튼이다.
- * - 네이버는 공식 지정 녹색 배경과 흰색 심볼을 사용한다.
- * - 구글은 흰색 배경, 얇은 테두리, Google 아이콘, 명확한 CTA를 사용한다.
+ * - 피그마 Hom_000_001_로그인 디자인 기준으로 구현한다.
+ * - borderRadius 20px, padding 10px 20px, 로고 32x32, space-between 정렬
+ * - Apple: 검정 배경, 흰색 텍스트
+ * - 네이버: 초록 배경(#03A94D), 흰색 텍스트
+ * - Google: 흰색 배경, 회색 테두리(#747775), 검정 텍스트(#1F1F1F)
  */
 export function SocialLoginButton({
   provider,
@@ -29,12 +63,8 @@ export function SocialLoginButton({
   isLoading = false,
   onPress,
 }: SocialLoginButtonProps) {
-  const isNaver = provider === 'naver';
-  const label = isLoading
-    ? '처리 중'
-    : isNaver
-      ? '네이버로 계속하기'
-      : 'Google로 계속하기';
+  const config = PROVIDER_CONFIG[provider];
+  const label = isLoading ? '처리 중' : config.label;
 
   return (
     <Pressable
@@ -44,20 +74,17 @@ export function SocialLoginButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
-        isNaver ? styles.naverButton : styles.googleButton,
         {
+          backgroundColor: config.backgroundColor,
+          borderColor: config.borderColor,
           opacity: disabled ? 0.52 : pressed ? 0.82 : 1,
         },
       ]}
     >
-      <View style={[styles.symbolBox, isNaver ? styles.naverSymbolBox : styles.googleSymbolBox]}>
-        {isNaver ? (
-          <Text style={styles.naverSymbol}>N</Text>
-        ) : (
-          <FontAwesome name="google" size={18} color="#4285F4" />
-        )}
-      </View>
-      <Text style={[styles.label, isNaver ? styles.naverLabel : styles.googleLabel]}>{label}</Text>
+      <SvgXml xml={config.svg} width={32} height={32} />
+      <Text style={[styles.label, { color: config.labelColor }]}>{label}</Text>
+      {/* 피그마 space-between을 위한 빈 placeholder (로고와 대칭) */}
+      <View style={styles.placeholder} />
     </Pressable>
   );
 }
@@ -65,49 +92,20 @@ export function SocialLoginButton({
 const styles = StyleSheet.create({
   button: {
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: 20,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     minHeight: 52,
-    paddingHorizontal: 16,
-  },
-  googleButton: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#DADCE0',
-  },
-  googleLabel: {
-    color: '#1F1F1F',
-  },
-  googleSymbolBox: {
-    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
   },
   label: {
-    fontSize: 15,
-    fontWeight: '700',
-    lineHeight: 20,
-  },
-  naverButton: {
-    backgroundColor: '#03A94D',
-    borderColor: '#03A94D',
-  },
-  naverLabel: {
-    color: '#FFFFFF',
-  },
-  naverSymbol: {
-    color: '#FFFFFF',
     fontSize: 18,
-    fontWeight: '900',
-    lineHeight: 20,
+    fontWeight: '500',
+    lineHeight: 25,
   },
-  naverSymbolBox: {
-    backgroundColor: '#03A94D',
-  },
-  symbolBox: {
-    alignItems: 'center',
-    height: 24,
-    justifyContent: 'center',
-    width: 24,
+  placeholder: {
+    width: 32,
   },
 });
